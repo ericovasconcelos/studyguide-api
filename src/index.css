@@ -5,9 +5,128 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: #121212;
+  color: #ffffff;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* Estilização para componentes mais profissionais */
+.ant-card, .ant-modal-content {
+  border-radius: 8px !important;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.dashboard-tabs .ant-tabs-tab {
+  border-radius: 8px 8px 0 0 !important;
+  margin-right: 4px !important;
+  padding: 8px 16px !important;
+  transition: all 0.3s ease;
+}
+
+.dashboard-tabs .ant-tabs-tab:hover {
+  color: #1890ff !important;
+}
+
+.dashboard-tabs .ant-tabs-tab-active {
+  background: #1e1e2f !important;
+}
+
+.ant-table-thead > tr > th {
+  background: #1e1e2f !important;
+  border-bottom: 1px solid #333 !important;
+  color: #fff !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(24, 144, 255, 0.1) !important;
+}
+
+.ant-picker-panel-container {
+  background-color: #1e1e2f !important;
+}
+
+.ant-select-dropdown {
+  background-color: #1e1e2f !important;
+}
+
+.ant-tooltip-inner, .ant-popover-inner {
+  background-color: #1e1e2f !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+.ant-tooltip-arrow-content, .ant-popover-arrow-content {
+  background-color: #1e1e2f !important;
+}
+
+.ant-alert {
+  background-color: #1e1e2f !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.ant-alert .ant-alert-message {
+  color: #fff !important;
+}
+
+.ant-alert .ant-alert-description {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.ant-btn {
+  border-radius: 6px !important;
+  box-shadow: none !important; 
+  transition: all 0.3s !important;
+}
+
+.ant-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.ant-statistic-content {
+  display: flex !important;
+  align-items: center !important;
+}
+
+.stat-card .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.ant-progress-bg {
+  transition: all 1s cubic-bezier(0.075, 0.82, 0.165, 1) !important;
+}
+
+.recharts-wrapper .recharts-cartesian-grid-horizontal line,
+.recharts-wrapper .recharts-cartesian-grid-vertical line {
+  stroke: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Animações */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ant-card {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.ant-card:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.ant-card:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.ant-card:nth-child(4) {
+  animation-delay: 0.3s;
 }
