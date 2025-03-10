@@ -1,70 +1,109 @@
-# Getting Started with Create React App
+# StudyGuide - Dashboard de Estudos
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Uma aplicação para tracking de estudos que se integra com a plataforma Gran Cursos.
 
-## Available Scripts
+## Recursos
 
-In the project directory, you can run:
+- 📊 Dashboard completo de análise de estudos
+- 📈 Gráficos interativos e estatísticas detalhadas
+- 🔄 Sincronização com Gran Cursos para importar dados de estudo
+- 📱 Suporte para sincronização entre dispositivos
+- 🔍 Filtros avançados por matéria, período e datas
+- 📅 Gerenciamento de ciclos de estudo
 
-### `npm start`
+## Estrutura do Projeto
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```
+studyguide/
+├── public/              # Arquivos estáticos
+├── src/                 # Código fonte do frontend (React)
+│   ├── components/      # Componentes React
+│   └── utils/           # Funções utilitárias
+├── tests/               # Testes automatizados
+├── mockDataGenerator.js # Gerador de dados simulados
+└── server.js            # Servidor API (proxy para Gran Cursos)
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Pré-requisitos
 
-### `npm test`
+- Node.js v18 ou superior
+- NPM v9 ou superior
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Instalação
 
-### `npm run build`
+Clone o repositório e instale as dependências:
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+git clone https://github.com/seu-usuario/studyguide.git
+cd studyguide
+npm install
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Execução
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Ambiente de Desenvolvimento
 
-### `npm run eject`
+Para iniciar o ambiente de desenvolvimento completo:
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```bash
+npm run dev
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Isso iniciará:
+- Frontend React na porta 3000
+- API local na porta 5000
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Apenas o Frontend
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```bash
+npm start
+```
 
-## Learn More
+### Apenas a API
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```bash
+npm run server
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Testes
 
-### Code Splitting
+### Testes do Frontend
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```bash
+npm test
+```
 
-### Analyzing the Bundle Size
+### Testes da API
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+```bash
+npm run test:api
+```
 
-### Making a Progressive Web App
+## API Local
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+A API local atua como um proxy para a API do Gran Cursos, facilitando o desenvolvimento e os testes.
 
-### Advanced Configuration
+### Endpoints
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+- `GET /status` - Verifica o status do servidor
+- `POST /verify-token` - Verifica se um token JWT é válido
+- `POST /fetch-gran-data` - Busca dados de estudo do Gran Cursos
+- `GET /mock-gran-api` - Simula a API do Gran Cursos (para testes)
 
-### Deployment
+### Tokens de Teste
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+Para desenvolvimento, você pode usar estes tokens:
+- `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.demo`
+- `test-token-1234`
 
-### `npm run build` fails to minify
+## Integração com Gran Cursos
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+A aplicação se conecta à API do Gran Cursos para importar dados de estudo. Para usar esta funcionalidade, você precisa de um token JWT válido do Gran Cursos.
+
+## Contribuição
+
+1. Faça um fork do projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/nova-funcionalidade`)
+3. Faça commit das suas alterações (`git commit -am 'Adiciona nova funcionalidade'`)
+4. Envie para a branch (`git push origin feature/nova-funcionalidade`)
+5. Crie um Pull Request

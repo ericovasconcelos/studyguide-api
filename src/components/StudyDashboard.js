@@ -1,11 +1,10 @@
 import React, { useState, useMemo } from "react";
-import { Card, Table, Button, Statistic, Row, Col, Typography, Tag, Select, DatePicker, Empty, Progress, Divider, Tooltip as AntTooltip, Tabs, Radio, Space, Alert, Badge } from "antd";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid, AreaChart, Area, ComposedChart, Scatter } from "recharts";
+import { Card, Table, Button, Statistic, Row, Col, Typography, Tag, Select, DatePicker, Empty, Progress, Tooltip as AntTooltip, Tabs, Radio, Space, Alert, Badge } from "antd";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid, AreaChart, Area, ComposedChart, Scatter } from "recharts";
 import { 
   ClockCircleOutlined, 
   BookOutlined, 
   CheckCircleOutlined, 
-  CalendarOutlined,
   TrophyOutlined,
   FireOutlined,
   ArrowUpOutlined,
@@ -18,8 +17,7 @@ import {
   SwapOutlined,
   FundOutlined,
   ThunderboltOutlined,
-  HistoryOutlined,
-  SyncOutlined
+  HistoryOutlined
 } from "@ant-design/icons";
 
 const { Title, Text, Paragraph } = Typography;

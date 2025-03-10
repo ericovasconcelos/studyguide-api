@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Button, Modal, Input, message, Drawer, Form, notification } from "antd";
+import { Button, Modal, Input, Drawer, Form, notification } from "antd";
 import StudyForm from "./components/StudyForm";
 import StudyCycleManager from "./components/StudyCycleManager";
 import StudyDashboard from "./components/StudyDashboard";
-import { getStoredRecords, saveStudyRecord, syncToCloud, isCloudSynced, disconnectFromCloud, getCloudData, getCloudStudyCycle } from "./utils/storage";
+import { getStoredRecords, saveStudyRecord, syncToCloud, isCloudSynced, disconnectFromCloud, getCloudData, getCloudStudyCycle, generateMockGranData } from "./utils/storage";
 import axios from "axios";
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, Typography, Tag } from 'antd';
 import { CloudUploadOutlined, CloudDownloadOutlined, LogoutOutlined } from "@ant-design/icons";
+
+const { Text } = Typography;
 
 export default function StudyTracker() {
   const [studyRecords, setStudyRecords] = useState([]);
@@ -60,10 +62,31 @@ export default function StudyTracker() {
     }
 
     try {
-      // Usar URL da API de produção quando estiver em produção
-      const apiUrl = "https://studyguide-api.onrender.com/fetch-gran-data";
-        
-      const response = await axios.post(apiUrl, { token: bearerToken });
+      // Mostrar notificação de carregamento
+      notification.info({
+        key: 'loading-notification',
+        message: "Buscando dados...",
+        description: "Conectando ao servidor, aguarde um momento...",
+        placement: "topRight",
+        duration: 0
+      });
+
+      // Escolher a API baseado no ambiente
+      const apiUrl = process.env.NODE_ENV === 'production' 
+        ? "https://studyguide-api.onrender.com/fetch-gran-data"
+        : "http://localhost:5000/fetch-gran-data";
+      
+      const response = await axios.post(apiUrl, { token: bearerToken }, {
+        timeout: 15000, // Timeout de 15 segundos
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${bearerToken}`
+        }
+      });
+      
+      // Fechar notificação de carregamento
+      notification.close('loading-notification');
+      
       if (response.data && response.data.studyRecords) {
         const newRecords = response.data.studyRecords.map((record) => ({
           date: record.date,
@@ -86,18 +109,114 @@ export default function StudyTracker() {
         saveStudyRecord(updatedRecords);
         notification.success({
           message: "Dados importados",
-          description: "Registros importados automaticamente do Gran Cursos!",
+          description: `${uniqueRecords.length} novos registros importados com sucesso do Gran Cursos!`,
+          placement: "topRight"
+        });
+      } else {
+        notification.warning({
+          message: "Sem novos dados",
+          description: "Não foram encontrados registros novos para importar.",
           placement: "topRight"
         });
       }
     } catch (error) {
+      // Fechar notificação de carregamento
+      notification.close('loading-notification');
+      
       console.error("Erro ao importar dados do Gran Cursos:", error);
+      
+      let errorMessage = "Erro ao buscar os registros do Gran Cursos.";
+      
+      // Mensagens de erro mais específicas com base no tipo de erro
+      if (error.code === 'ECONNABORTED') {
+        errorMessage = "Tempo limite excedido na conexão. O servidor pode estar lento ou indisponível.";
+      } else if (error.response) {
+        // Resposta foi recebida com código de erro
+        if (error.response.status === 401 || error.response.status === 403) {
+          errorMessage = "Acesso negado. Verifique se o seu token é válido.";
+        } else if (error.response.status === 404) {
+          errorMessage = "API não encontrada. O serviço pode estar temporariamente indisponível.";
+        } else if (error.response.status >= 500) {
+          errorMessage = "Erro no servidor da API. Tente novamente mais tarde.";
+        }
+      } else if (error.request) {
+        // Requisição foi feita mas não houve resposta
+        errorMessage = "Não foi possível conectar ao servidor. Verifique sua conexão com a internet.";
+      }
+      
       notification.error({
         message: "Erro de importação",
-        description: "Erro ao buscar os registros do Gran Cursos.",
-        placement: "topRight"
+        description: errorMessage,
+        placement: "topRight",
+        duration: 7,
+        btn: (
+          <Button 
+            type="primary" 
+            size="small" 
+            onClick={() => {
+              // Usar dados simulados
+              notification.close('error-notification');
+              handleMockData();
+            }}
+          >
+            Usar dados de demonstração
+          </Button>
+        ),
+        key: 'error-notification'
       });
     }
+  };
+  
+  // Função para usar dados simulados quando a API estiver indisponível
+  const handleMockData = () => {
+    notification.info({
+      message: "Usando dados de demonstração",
+      description: "Carregando dados simulados para demonstração...",
+      placement: "topRight",
+      duration: 2
+    });
+    
+    // Pequeno atraso para simular carregamento
+    setTimeout(() => {
+      try {
+        const mockResponse = generateMockGranData();
+        
+        if (mockResponse && mockResponse.studyRecords) {
+          const newRecords = mockResponse.studyRecords.map((record) => ({
+            date: record.date,
+            subject: record.subject,
+            studyTime: `${Math.floor(record.studyTime / 3600)}:${Math.floor((record.studyTime % 3600) / 60)}`,
+            totalExercises: record.totalExercises || 0,
+            correctAnswers: record.correctAnswers || 0,
+            studyType: record.studyType || "Desconhecido"
+          }));
+
+          // Remover duplicatas
+          const uniqueRecords = newRecords.filter(newRecord =>
+            !studyRecords.some(existingRecord =>
+              existingRecord.date === newRecord.date && existingRecord.subject === newRecord.subject
+            )
+          );
+
+          const updatedRecords = [...studyRecords, ...uniqueRecords];
+          setStudyRecords(updatedRecords);
+          saveStudyRecord(updatedRecords);
+          
+          notification.success({
+            message: "Dados de demonstração importados",
+            description: `${uniqueRecords.length} registros de demonstração foram adicionados com sucesso.`,
+            placement: "topRight"
+          });
+        }
+      } catch (error) {
+        console.error("Erro ao gerar dados simulados:", error);
+        notification.error({
+          message: "Erro nos dados de demonstração",
+          description: "Não foi possível gerar os dados de demonstração.",
+          placement: "topRight"
+        });
+      }
+    }, 1500);
   };
 
   const clearStudyRecords = () => {
@@ -240,13 +359,44 @@ export default function StudyTracker() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
-          <Button type="primary" onClick={fetchGranData}>
-            Importar do Gran Cursos
-          </Button>
-          <Button type="info" onClick={clearStudyRecords}>
-            Limpar Registros
-          </Button>
+        <div style={{ marginBottom: "10px" }}>
+          <div style={{ 
+            display: "flex", 
+            justifyContent: "space-between", 
+            alignItems: "center", 
+            marginBottom: "8px", 
+            background: "#1e1e3f", 
+            padding: "8px 12px", 
+            borderRadius: "4px" 
+          }}>
+            <div>
+              <Text style={{ color: "#1890ff", marginRight: "8px" }}>API Local:</Text>
+              <Text style={{ color: "#fff" }}>Use os tokens: </Text>
+              <Tag color="green">eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.demo</Tag>
+              <Text style={{ color: "#fff" }}>ou</Text>
+              <Tag color="green">test-token-1234</Tag>
+            </div>
+            <a 
+              href="http://localhost:5000/fetch-gran-data" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              style={{ color: "#1890ff", fontSize: "12px" }}
+            >
+              API Endpoint
+            </a>
+          </div>
+          
+          <div style={{ display: "flex", gap: "10px" }}>
+            <Button type="primary" onClick={fetchGranData}>
+              Importar do Gran Cursos
+            </Button>
+            <Button onClick={handleMockData} style={{ background: "#722ed1", color: "#fff" }}>
+              Dados de Demonstração
+            </Button>
+            <Button type="default" onClick={clearStudyRecords} danger>
+              Limpar Registros
+            </Button>
+          </div>
         </div>
 
         <div style={{ backgroundColor: "#1e1e2f", padding: "20px", borderRadius: "10px" }}>

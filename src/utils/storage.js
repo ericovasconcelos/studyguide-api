@@ -173,3 +173,51 @@ export const getCloudStudyCycle = () => {
     return null;
   }
 };
+
+// Função para gerar dados de exemplo do Gran Cursos
+export const generateMockGranData = () => {
+  const subjects = [
+    "Direito Constitucional", 
+    "Direito Administrativo", 
+    "Português", 
+    "Raciocínio Lógico", 
+    "Informática"
+  ];
+  
+  const studyTypes = ["Teoria", "Exercícios", "Revisão", "Simulado"];
+  
+  // Gera datas dos últimos 14 dias
+  const dates = [];
+  const today = new Date();
+  for (let i = 0; i < 14; i++) {
+    const date = new Date();
+    date.setDate(today.getDate() - i);
+    dates.push(date.toISOString().split('T')[0] + 'T08:00:00');
+  }
+  
+  // Cria de 15 a 25 registros aleatórios
+  const records = [];
+  const recordCount = Math.floor(Math.random() * 10) + 15;
+  
+  for (let i = 0; i < recordCount; i++) {
+    const subject = subjects[Math.floor(Math.random() * subjects.length)];
+    const date = dates[Math.floor(Math.random() * dates.length)];
+    const studyTime = Math.floor(Math.random() * 10800) + 1800; // Entre 30min e 3h30 (em segundos)
+    const totalExercises = Math.floor(Math.random() * 50) + 10;
+    const correctAnswers = Math.floor(Math.random() * (totalExercises + 1));
+    const studyType = studyTypes[Math.floor(Math.random() * studyTypes.length)];
+    
+    records.push({
+      date,
+      subject,
+      studyTime,
+      totalExercises,
+      correctAnswers,
+      studyType
+    });
+  }
+  
+  return {
+    studyRecords: records
+  };
+};
