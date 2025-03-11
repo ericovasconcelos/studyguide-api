@@ -2,13 +2,15 @@ import React, { useState, useEffect } from "react";
 import { Input, InputNumber, Button, Upload, List, Select, Tabs, Card, Badge, Spin, Alert, Tooltip } from "antd";
 import { UploadOutlined, CloudOutlined, FileOutlined, SyncOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import Papa from "papaparse";
+import axios from "axios";
 import { syncStudyCycleWithCloud } from "../utils/storage";
-import { 
+// Importamos como CommonJS agora
+const { 
   fetchCyclesFromAPI, 
   detectCycleRounds, 
   mergeCycleWithLocalGoals,
   saveLocalGoals
-} from "../utils/cycleIntegration";
+} = require("../utils/cycleIntegration");
 
 const { Option } = Select;
 const { TabPane } = Tabs;
@@ -33,38 +35,108 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [subjectTargetTime, setSubjectTargetTime] = useState(10); // horas
   
-  // Carregar ciclos da API quando o token muda
-  useEffect(() => {
-    if (apiToken && activeTab === 'api') {
-      loadCyclesFromAPI();
+  // Função para buscar matérias da API - DEFINIDA PRIMEIRO para evitar referências antes da inicialização
+  const loadSubjectsFromAPI = React.useCallback(async (cycleId, roundId) => {
+    console.log(`Carregando disciplinas para ciclo ${cycleId}, rodada ${roundId}...`);
+    try {
+      // Verificar parâmetros
+      if (!cycleId || !roundId) {
+        console.warn('Ciclo ID ou Rodada ID não fornecidos');
+        setApiSubjects([]);
+        return [];
+      }
+      
+      // Limpar seleção anterior e disciplinas
+      setSelectedSubject(null);
+      
+      // Configurar a requisição para buscar os registros de estudo
+      const apiUrl = 'https://bj4jvnteuk.execute-api.us-east-1.amazonaws.com/v1/estudo';
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json'
+        },
+        params: {
+          page: 1,
+          perPage: 500, // Aumentamos para pegar mais registros
+          sort: 'desc'
+        }
+      };
+      
+      console.log('Fazendo requisição para API de estudo...');
+      
+      // Usar axios para fazer a requisição
+      const response = await axios.get(apiUrl, config);
+      
+      // Verificar se há dados válidos
+      if (!response.data?.data?.rows) {
+        console.error('Formato de resposta inválido');
+        throw new Error('Formato de resposta inválido');
+      }
+      
+      console.log(`Total de registros retornados: ${response.data.data.rows.length}`);
+      
+      // Filtrar registros pelo ciclo e rodada selecionados
+      const records = response.data.data.rows.filter(record => {
+        const matchesCycle = record.cicloId == cycleId; // Comparação não estrita para permitir string/number
+        const matchesRound = record.versao == roundId; // Comparação não estrita
+        return matchesCycle && matchesRound;
+      });
+      
+      console.log(`Registros filtrados para ciclo ${cycleId} rodada ${roundId}: ${records.length}`);
+      
+      // Extrair disciplinas únicas destes registros
+      const uniqueSubjects = new Map();
+      records.forEach(record => {
+        if (record.disciplinaId && record.disciplinaTexto) {
+          uniqueSubjects.set(record.disciplinaId, {
+            id: record.disciplinaId,
+            name: record.disciplinaTexto
+          });
+        }
+      });
+      
+      // Converter para array e ordenar por nome
+      const subjectsList = Array.from(uniqueSubjects.values());
+      subjectsList.sort((a, b) => a.name.localeCompare(b.name));
+      
+      console.log(`Carregadas ${subjectsList.length} disciplinas para o ciclo ${cycleId}, rodada ${roundId}`);
+      if (subjectsList.length > 0) {
+        console.log('Exemplos de disciplinas:', subjectsList.slice(0, 3).map(s => s.name).join(', '), '...');
+      }
+      
+      setApiSubjects(subjectsList);
+      
+      return subjectsList;
+    } catch (error) {
+      console.error("Erro ao carregar disciplinas:", error);
+      setErrorMessage(`Erro ao carregar disciplinas: ${error.message}`);
+      setApiSubjects([]);
+      return [];
     }
-  }, [apiToken, activeTab, loadCyclesFromAPI]);
-  
-  // Carregar rodadas quando um ciclo é selecionado
-  useEffect(() => {
-    if (selectedCycleId && apiToken) {
-      loadCycleRounds();
-    } else {
-      setCycleRounds([]);
-      setSelectedRound(null);
-    }
-  }, [selectedCycleId, apiToken, loadCycleRounds]);
-  
-  // Atualizar disciplinas quando a rodada muda
-  useEffect(() => {
-    if (selectedCycleId && selectedRound && apiToken) {
-      loadSubjectsFromAPI(selectedCycleId, selectedRound);
-    }
-  }, [selectedRound, selectedCycleId, apiToken, loadSubjectsFromAPI]);
-  
+  }, [apiToken]);
+
   // Função para carregar ciclos da API
   const loadCyclesFromAPI = React.useCallback(async () => {
+    console.log("Botão clicado: Carregar ciclos da API");
     setIsLoadingApiCycles(true);
     setErrorMessage("");
     
     try {
+      console.log("Token usado na requisição:", apiToken ? "Token presente" : "Token ausente");
+      
+      if (!apiToken) {
+        setErrorMessage("Token não fornecido. Por favor, insira um token de API válido.");
+        setIsLoadingApiCycles(false);
+        return;
+      }
+      
+      console.log("Chamando fetchCyclesFromAPI...");
       const cycles = await fetchCyclesFromAPI(apiToken);
+      console.log("Ciclos recebidos:", cycles);
+      
       setApiCycles(cycles);
+      alert(`${cycles.length} ciclos carregados com sucesso!`);
       
       // Se houver ciclos, selecionar o primeiro por padrão
       if (cycles.length > 0) {
@@ -72,6 +144,7 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
       }
     } catch (error) {
       console.error("Erro ao carregar ciclos da API:", error);
+      alert(`Erro ao carregar ciclos: ${error.message}`);
       setErrorMessage(`Erro ao carregar ciclos: ${error.message}`);
     } finally {
       setIsLoadingApiCycles(false);
@@ -99,62 +172,48 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
     }
   }, [apiToken, selectedCycleId, loadSubjectsFromAPI]);
   
-  // Função para buscar matérias da API
-  const loadSubjectsFromAPI = React.useCallback(async (cycleId, roundId) => {
-    try {
-      // Configurar a requisição para buscar os registros de estudo
-      const apiUrl = 'https://bj4jvnteuk.execute-api.us-east-1.amazonaws.com/v1/estudo';
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${apiToken}`,
-          'Content-Type': 'application/json'
-        },
-        params: {
-          page: 1,
-          perPage: 100,
-          sort: 'desc'
-        }
-      };
-      
-      // Usar axios para fazer a requisição
-      const response = await axios.get(apiUrl, config);
-      
-      // Verificar se há dados válidos
-      if (!response.data?.data?.rows) {
-        throw new Error('Formato de resposta inválido');
-      }
-      
-      // Filtrar registros pelo ciclo e rodada selecionados
-      const records = response.data.data.rows.filter(record => 
-        (record.cicloId === cycleId || record.cicloId === parseInt(cycleId)) && 
-        (record.versao === roundId || record.versao === parseInt(roundId))
-      );
-      
-      // Extrair disciplinas únicas destes registros
-      const uniqueSubjects = new Map();
-      records.forEach(record => {
-        if (record.disciplinaId && record.disciplinaTexto) {
-          uniqueSubjects.set(record.disciplinaId, {
-            id: record.disciplinaId,
-            name: record.disciplinaTexto
-          });
-        }
-      });
-      
-      // Converter para array e ordenar por nome
-      const subjectsList = Array.from(uniqueSubjects.values());
-      subjectsList.sort((a, b) => a.name.localeCompare(b.name));
-      
-      console.log(`Carregadas ${subjectsList.length} disciplinas para o ciclo ${cycleId}, rodada ${roundId}`);
-      setApiSubjects(subjectsList);
-      
-      return subjectsList;
-    } catch (error) {
-      console.error("Erro ao carregar disciplinas:", error);
-      setErrorMessage(`Erro ao carregar disciplinas: ${error.message}`);
-      return [];
+  // Removemos a chamada automática quando a aba muda para usar apenas o botão
+  
+  // Carregar rodadas quando um ciclo é selecionado
+  useEffect(() => {
+    if (selectedCycleId && apiToken) {
+      loadCycleRounds();
+    } else {
+      setCycleRounds([]);
+      setSelectedRound(null);
     }
-  }, [apiToken]);
+  }, [selectedCycleId, apiToken, loadCycleRounds]);
+  
+  // Atualizar disciplinas quando a rodada muda
+  useEffect(() => {
+    console.log("Efeito de mudança de rodada disparado:", 
+      { ciclo: selectedCycleId, rodada: selectedRound, tokenPresente: !!apiToken });
+    
+    if (selectedCycleId && selectedRound && apiToken) {
+      console.log("Requisitando busca de disciplinas após mudança de rodada");
+      
+      // Mostrar mensagem de carregamento
+      setErrorMessage("Carregando disciplinas...");
+      
+      // Carrega com um pequeno delay para garantir que a interface atualizou
+      setTimeout(() => {
+        loadSubjectsFromAPI(selectedCycleId, selectedRound)
+          .then(subjects => {
+            console.log(`Carregamento concluído: ${subjects.length} disciplinas encontradas`);
+            setErrorMessage("");
+          })
+          .catch(err => {
+            console.error("Erro no efeito de atualização de disciplinas:", err);
+          });
+      }, 100);
+    } else {
+      // Limpar disciplinas quando não há rodada selecionada
+      if (!selectedRound) {
+        console.log("Limpando lista de disciplinas pois não há rodada selecionada");
+        setApiSubjects([]);
+      }
+    }
+  }, [selectedRound, selectedCycleId, apiToken, loadSubjectsFromAPI]);
 
   const handleAddSubject = () => {
     if (newSubject && newTime > 0) {
@@ -216,6 +275,12 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
     }
     
     try {
+      // Encontrar o nome da disciplina selecionada
+      const selectedSubjectInfo = apiSubjects.find(subject => subject.id === selectedSubject);
+      const subjectName = selectedSubjectInfo ? selectedSubjectInfo.name : `Disciplina ${selectedSubject}`;
+      
+      console.log(`Definindo meta para disciplina: ${subjectName}`);
+      
       // Estrutura de dados para as metas
       const newGoal = {
         [selectedCycleId]: {
@@ -230,8 +295,49 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
       // Salvar localmente
       saveLocalGoals(newGoal);
       
+      // Adicionar/atualizar no ciclo local
+      const updatedLocalCycle = [...studyCycle];
+      
+      // Verificar se já existe uma matéria com este nome
+      const existingIndex = updatedLocalCycle.findIndex(item => 
+        item.subject === subjectName || 
+        (item.apiInfo && item.apiInfo.subjectId === selectedSubject)
+      );
+      
+      if (existingIndex >= 0) {
+        // Atualizar a matéria existente
+        updatedLocalCycle[existingIndex] = {
+          ...updatedLocalCycle[existingIndex],
+          subject: subjectName,
+          targetTime: subjectTargetTime * 60,
+          apiInfo: {
+            subjectId: selectedSubject,
+            cycleId: selectedCycleId,
+            roundId: selectedRound
+          }
+        };
+      } else {
+        // Adicionar nova matéria
+        updatedLocalCycle.push({
+          subject: subjectName,
+          targetTime: subjectTargetTime * 60,
+          apiInfo: {
+            subjectId: selectedSubject,
+            cycleId: selectedCycleId,
+            roundId: selectedRound
+          }
+        });
+      }
+      
+      // Atualizar o ciclo local
+      setStudyCycle(updatedLocalCycle);
+      localStorage.setItem("studyCycle", JSON.stringify(updatedLocalCycle));
+      
+      // Tenta sincronizar com a nuvem se estiver disponível
+      syncStudyCycleWithCloud(updatedLocalCycle);
+      
       // Feedback ao usuário
-      alert(`Meta definida: ${subjectTargetTime} horas para a disciplina selecionada na rodada ${selectedRound} do ciclo`);
+      alert(`Meta definida: ${subjectTargetTime} horas para ${subjectName} na rodada ${selectedRound} do ciclo`);
       
       // Limpar campos
       setSelectedSubject(null);
@@ -245,11 +351,7 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
   // Função para alternar entre os modos local e API
   const handleTabChange = (key) => {
     setActiveTab(key);
-    
-    // Se alternar para a tab da API e tiver token, carregar dados
-    if (key === 'api' && apiToken) {
-      loadCyclesFromAPI();
-    }
+    // Removemos a chamada automática, agora só carrega quando clica no botão
   };
 
   const handleImportCSV = (file) => {
@@ -440,7 +542,7 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
                 }
               >
                 <div style={{ marginBottom: "15px" }}>
-                  <label>Selecione uma Disciplina:</label>
+                  <label>Selecione uma Disciplina: <span style={{ color: "#1890ff" }}>({apiSubjects.length} disciplinas disponíveis)</span></label>
                   <Select 
                     style={{ width: "100%", marginTop: "5px" }} 
                     value={selectedSubject}
@@ -465,13 +567,94 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
                   />
                 </div>
                 
-                <Button 
-                  type="primary" 
-                  onClick={handleSetApiSubjectGoal}
-                  disabled={!selectedSubject}
-                >
-                  Definir Meta
-                </Button>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <Button 
+                    type="primary" 
+                    onClick={handleSetApiSubjectGoal}
+                    disabled={!selectedSubject}
+                  >
+                    Definir Meta para Disciplina Selecionada
+                  </Button>
+                  
+                  <Button
+                    type="default"
+                    disabled={!selectedCycleId || !selectedRound || apiSubjects.length === 0 || subjectTargetTime <= 0}
+                    onClick={() => {
+                      // Confirmar antes de aplicar para todas
+                      if (window.confirm(`Definir ${subjectTargetTime} horas como meta para TODAS as ${apiSubjects.length} disciplinas?`)) {
+                        try {
+                          // Estrutura para armazenar todas as metas
+                          const allGoals = {
+                            [selectedCycleId]: {
+                              [selectedRound]: {}
+                            }
+                          };
+                          
+                          // Atualizar o ciclo local
+                          const updatedLocalCycle = [...studyCycle];
+                          
+                          // Para cada disciplina
+                          apiSubjects.forEach(subject => {
+                            // Adicionar à estrutura de metas
+                            allGoals[selectedCycleId][selectedRound][subject.id] = {
+                              targetTime: subjectTargetTime * 60
+                            };
+                            
+                            // Verificar se já existe no ciclo local
+                            const existingIndex = updatedLocalCycle.findIndex(item => 
+                              item.subject === subject.name || 
+                              (item.apiInfo && item.apiInfo.subjectId === subject.id)
+                            );
+                            
+                            if (existingIndex >= 0) {
+                              // Atualizar disciplina existente
+                              updatedLocalCycle[existingIndex] = {
+                                ...updatedLocalCycle[existingIndex],
+                                subject: subject.name,
+                                targetTime: subjectTargetTime * 60,
+                                apiInfo: {
+                                  subjectId: subject.id,
+                                  cycleId: selectedCycleId,
+                                  roundId: selectedRound
+                                }
+                              };
+                            } else {
+                              // Adicionar nova disciplina
+                              updatedLocalCycle.push({
+                                subject: subject.name,
+                                targetTime: subjectTargetTime * 60,
+                                apiInfo: {
+                                  subjectId: subject.id,
+                                  cycleId: selectedCycleId,
+                                  roundId: selectedRound
+                                }
+                              });
+                            }
+                          });
+                          
+                          // Salvar todas as metas
+                          saveLocalGoals(allGoals);
+                          
+                          // Atualizar o ciclo local
+                          setStudyCycle(updatedLocalCycle);
+                          localStorage.setItem("studyCycle", JSON.stringify(updatedLocalCycle));
+                          
+                          // Sincronizar com a nuvem
+                          syncStudyCycleWithCloud(updatedLocalCycle);
+                          
+                          // Feedback
+                          alert(`Metas definidas: ${subjectTargetTime} horas para todas as ${apiSubjects.length} disciplinas`);
+                        } catch (error) {
+                          console.error("Erro ao definir metas para todas:", error);
+                          setErrorMessage(`Erro ao definir metas: ${error.message}`);
+                        }
+                      }
+                    }}
+                    style={{ whiteSpace: "nowrap" }}
+                  >
+                    Aplicar a Todas
+                  </Button>
+                </div>
               </Card>
             </div>
           )}

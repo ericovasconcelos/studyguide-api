@@ -18,10 +18,8 @@ const localStorageMock = (() => {
 // Create mock for fetch
 global.fetch = jest.fn();
 
-// Set up global mocks
-Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock
-});
+// Set up global mocks for node environment
+global.localStorage = localStorageMock;
 
 // Create dummy mock for console methods to keep tests clean
 global.console = {

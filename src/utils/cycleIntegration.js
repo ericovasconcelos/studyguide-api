@@ -5,7 +5,8 @@
  * incluindo a integração entre os dados da API e as metas locais.
  */
 
-import axios from 'axios';
+// Importação do axios de forma consistente para evitar problemas
+const axios = require('axios');
 
 // URL base da API do Gran Cursos
 const API_BASE_URL = 'https://bj4jvnteuk.execute-api.us-east-1.amazonaws.com/v1';
@@ -16,10 +17,12 @@ const API_BASE_URL = 'https://bj4jvnteuk.execute-api.us-east-1.amazonaws.com/v1'
  * @param {boolean} useLocalFallback - Se deve usar dados locais em caso de falha
  * @returns {Promise<Array>} - Lista de ciclos de estudo
  */
-export const fetchCyclesFromAPI = async (token, useLocalFallback = true) => {
+const fetchCyclesFromAPI = async (token, useLocalFallback = true) => {
+  console.log('Iniciando busca de ciclos com token:', token ? 'Token presente' : 'Token ausente');
   try {
     // Verificar se o token está presente
     if (!token) {
+      console.error('Token não fornecido');
       throw new Error('Token não fornecido');
     }
 
@@ -31,27 +34,67 @@ export const fetchCyclesFromAPI = async (token, useLocalFallback = true) => {
       }
     };
 
-    // Buscar dados de ciclos
-    const response = await axios.get(`${API_BASE_URL}/ciclo-estudo?page=1&perPage=50`, config);
+    // Vamos tentar obter ciclos a partir dos registros de estudo já que o endpoint de ciclos retorna vazio
+    console.log('Fazendo requisição para endpoint de estudo para extrair ciclos...');
+    const studyResponse = await axios.get(`${API_BASE_URL}/estudo?page=1&perPage=100`, config);
+    
+    console.log('Resposta de estudo recebida:', studyResponse.status);
     
     // Verificar se há dados válidos
-    if (!response.data || !response.data.data || !response.data.data.rows) {
-      throw new Error('Formato de resposta inválido da API de ciclos');
+    if (!studyResponse.data || !studyResponse.data.data || !studyResponse.data.data.rows) {
+      console.error('Formato de resposta inválido do endpoint de estudo:', studyResponse.data);
+      throw new Error('Não foi possível obter dados de estudo para extrair ciclos');
     }
 
-    // Mapear os dados para o formato da aplicação
-    const cycles = response.data.data.rows.map(mapCycleData);
+    // Extrair ciclos únicos dos registros de estudo
+    const studyRecords = studyResponse.data.data.rows;
+    console.log(`Total de registros de estudo: ${studyRecords.length}`);
+    
+    // Map para armazenar ciclos únicos por ID
+    const cyclesMap = new Map();
+    
+    // Extrair informações de ciclo de cada registro
+    studyRecords.forEach(record => {
+      if (record.cicloId) {
+        // Se este ciclo ainda não foi registrado, adicionar ao map
+        if (!cyclesMap.has(record.cicloId)) {
+          cyclesMap.set(record.cicloId, {
+            id: record.cicloId,
+            name: record.cicloTexto || `Ciclo ${record.cicloId}`,
+            startDate: record.dataEstudo ? record.dataEstudo.split('T')[0] : new Date().toISOString().split('T')[0],
+            isActive: true,
+            isFromAPI: true
+          });
+        }
+      }
+    });
+    
+    // Converter o Map para array
+    const cycles = Array.from(cyclesMap.values());
+    console.log(`Ciclos extraídos com sucesso: ${cycles.length} ciclos`);
+    
+    // Salvar os ciclos localmente para uso futuro
+    localStorage.setItem('studyCycles', JSON.stringify(cycles));
     
     return cycles;
   } catch (error) {
+    console.error('Erro completo ao buscar ciclos:', error);
+    
     // Tratar erros específicos
     if (error.response) {
       // Erro de resposta da API
+      console.error('Erro de resposta:', error.response.status, error.response.statusText);
+      console.error('Dados do erro:', error.response.data);
+      
       if (error.response.status === 401 || error.response.status === 403) {
         throw new Error(`Token inválido ou expirado: ${error.response.data?.message || 'Acesso negado'}`);
       }
       
       throw new Error(`Erro ao buscar ciclos: ${error.response.data?.message || error.message}`);
+    } else if (error.request) {
+      // A requisição foi feita mas não houve resposta
+      console.error('Sem resposta do servidor:', error.request);
+      throw new Error('Sem resposta do servidor. Verifique sua conexão com a internet.');
     }
     
     // Se for para usar fallback e houver um erro de conexão
@@ -63,6 +106,7 @@ export const fetchCyclesFromAPI = async (token, useLocalFallback = true) => {
     }
     
     // Repassar o erro
+    console.error('Erro não tratado:', error.message);
     throw error;
   }
 };
@@ -72,7 +116,7 @@ export const fetchCyclesFromAPI = async (token, useLocalFallback = true) => {
  * @param {Object} rawCycle - Dados brutos do ciclo da API
  * @returns {Object} - Ciclo no formato da aplicação
  */
-export const mapCycleData = (rawCycle) => {
+const mapCycleData = (rawCycle) => {
   return {
     id: rawCycle.id,
     name: rawCycle.nome || rawCycle.descricao || 'Ciclo sem nome',
@@ -89,14 +133,17 @@ export const mapCycleData = (rawCycle) => {
  * @param {number} cycleId - ID do ciclo
  * @returns {Promise<Array>} - Lista de rodadas/versões encontradas
  */
-export const detectCycleRounds = async (token, cycleId) => {
+const detectCycleRounds = async (token, cycleId) => {
+  console.log(`Detectando rodadas para ciclo ID: ${cycleId}`);
   try {
     // Verificar parâmetros
     if (!token) {
+      console.error('Token não fornecido para detectCycleRounds');
       throw new Error('Token não fornecido');
     }
     
     if (!cycleId) {
+      console.error('ID do ciclo não fornecido para detectCycleRounds');
       throw new Error('ID do ciclo não fornecido');
     }
 
@@ -108,21 +155,31 @@ export const detectCycleRounds = async (token, cycleId) => {
       }
     };
 
+    console.log('Buscando registros de estudo da API...');
+    
     // Buscar registros de estudo deste ciclo
     const response = await axios.get(
       `${API_BASE_URL}/estudo?page=1&perPage=100&sort=desc`, 
       config
     );
     
+    console.log('Resposta de estudo recebida:', response.status);
+    
     // Verificar se há dados válidos
     if (!response.data || !response.data.data || !response.data.data.rows) {
+      console.error('Formato de resposta inválido:', response.data);
       throw new Error('Formato de resposta inválido da API de estudos');
     }
 
+    console.log(`Total de registros recebidos: ${response.data.data.rows.length}`);
+
     // Filtrar registros deste ciclo
-    const cycleRecords = response.data.data.rows.filter(
-      record => record.cicloId === cycleId || record.cicloId === String(cycleId)
-    );
+    const cycleRecords = response.data.data.rows.filter(record => {
+      const matchesCycle = record.cicloId == cycleId; // Comparação não estrita para permitir string/number
+      return matchesCycle;
+    });
+    
+    console.log(`Registros filtrados para o ciclo ${cycleId}: ${cycleRecords.length}`);
     
     // Extrair versões únicas
     const versionsSet = new Set();
@@ -132,6 +189,8 @@ export const detectCycleRounds = async (token, cycleId) => {
       const version = record.versao || 1;
       versionsSet.add(version);
     });
+    
+    console.log(`Versões encontradas: ${Array.from(versionsSet).join(', ')}`);
     
     // Converter para array e formatar
     const rounds = Array.from(versionsSet).map(version => ({
@@ -143,9 +202,18 @@ export const detectCycleRounds = async (token, cycleId) => {
     // Ordenar por versão
     rounds.sort((a, b) => a.version - b.version);
     
+    console.log(`Rodadas formatadas: ${rounds.length}`);
     return rounds;
   } catch (error) {
-    console.error('Erro ao detectar rodadas do ciclo:', error);
+    console.error('Erro completo ao detectar rodadas do ciclo:', error);
+    
+    if (error.response) {
+      console.error('Erro de resposta:', error.response.status, error.response.statusText);
+      console.error('Dados do erro:', error.response.data);
+    } else if (error.request) {
+      console.error('Sem resposta do servidor:', error.request);
+    }
+    
     throw error;
   }
 };
@@ -155,7 +223,7 @@ export const detectCycleRounds = async (token, cycleId) => {
  * @param {Object} cycle - Ciclo a ser mesclado
  * @returns {Object} - Ciclo com suas metas
  */
-export const mergeCycleWithLocalGoals = (cycle) => {
+const mergeCycleWithLocalGoals = (cycle) => {
   try {
     // Buscar metas salvas localmente
     const localGoals = JSON.parse(localStorage.getItem('cycleGoals') || '{}');
@@ -183,7 +251,7 @@ export const mergeCycleWithLocalGoals = (cycle) => {
  * @param {number} targetTime - Tempo alvo em minutos
  * @returns {number} - Porcentagem de progresso (0-100)
  */
-export const calculateProgress = (records, subjectId, version, targetTime) => {
+const calculateProgress = (records, subjectId, version, targetTime) => {
   try {
     // Filtrar registros pela disciplina e versão
     const filteredRecords = records.filter(
@@ -213,7 +281,7 @@ export const calculateProgress = (records, subjectId, version, targetTime) => {
  * Salva as metas locais, mesclando com as existentes
  * @param {Object} newGoals - Novas metas a serem salvas
  */
-export const saveLocalGoals = (newGoals) => {
+const saveLocalGoals = (newGoals) => {
   try {
     // Buscar metas salvas anteriormente
     const existingGoals = JSON.parse(localStorage.getItem('cycleGoals') || '{}');
@@ -259,7 +327,7 @@ const mergeDeep = (target, source) => {
   return target;
 };
 
-export default {
+module.exports = {
   fetchCyclesFromAPI,
   mapCycleData,
   detectCycleRounds,
