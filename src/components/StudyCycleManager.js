@@ -10,7 +10,21 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
 
   const handleAddSubject = () => {
     if (newSubject && newTime > 0) {
-      const updatedCycle = [...studyCycle, { subject: newSubject, targetTime: newTime * 60 }];
+      // Garantir que newTime seja um número
+      const targetTimeInMinutes = parseFloat(newTime) * 60;
+      
+      if (isNaN(targetTimeInMinutes)) {
+        console.error("Tempo inválido:", newTime);
+        return;
+      }
+      
+      console.log("Adicionando nova matéria ao ciclo:", newSubject, "com", targetTimeInMinutes, "minutos");
+      
+      const updatedCycle = [...studyCycle, { 
+        subject: newSubject, 
+        targetTime: targetTimeInMinutes
+      }];
+      
       setStudyCycle(updatedCycle);
       localStorage.setItem("studyCycle", JSON.stringify(updatedCycle));
       
@@ -49,10 +63,32 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
   const handleImportCSV = (file) => {
     Papa.parse(file, {
       complete: (result) => {
-        const newCycle = result.data.slice(1).map((row) => ({
-          subject: row[0],
-          targetTime: parseFloat(row[1]) * 60, // Convertendo para minutos
-        })).filter(item => item.subject && !isNaN(item.targetTime));
+        console.log("Dados CSV importados:", result.data);
+        
+        const newCycle = result.data.slice(1).map((row) => {
+          if (!row[0]) return null; // Pular linha sem matéria
+          
+          let targetTime = 600; // 10 horas em minutos (valor padrão)
+          
+          // Tentar converter o tempo para número
+          if (row[1]) {
+            const parsedTime = parseFloat(row[1]);
+            if (!isNaN(parsedTime) && parsedTime > 0) {
+              targetTime = parsedTime * 60; // Convertendo para minutos
+            } else {
+              console.warn(`Valor de tempo inválido para "${row[0]}": ${row[1]}, usando padrão de 10h`);
+            }
+          } else {
+            console.warn(`Tempo não especificado para "${row[0]}", usando padrão de 10h`);
+          }
+          
+          return {
+            subject: row[0],
+            targetTime: targetTime
+          };
+        }).filter(Boolean); // Remover itens nulos
+        
+        console.log("Ciclo importado:", newCycle);
         
         setStudyCycle(newCycle);
         localStorage.setItem("studyCycle", JSON.stringify(newCycle));
@@ -82,14 +118,29 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
       <h3>Matérias no Ciclo</h3>
       <List
         dataSource={studyCycle}
-        renderItem={(item) => (
-          <List.Item>
-            <strong>{item.subject}</strong> - {item.targetTime ? Math.round(item.targetTime / 60) : (item.time || 0)} horas
-            <Button type="link" danger onClick={() => handleRemoveSubject(item.subject)}>
-              Remover
-            </Button>
-          </List.Item>
-        )}
+        renderItem={(item) => {
+          // Calcular o valor correto de horas
+          let hoursDisplay = 0;
+          
+          if (item.targetTime !== undefined && item.targetTime !== null) {
+            if (typeof item.targetTime === 'number' && !isNaN(item.targetTime)) {
+              hoursDisplay = Math.round(item.targetTime / 60);
+            } else {
+              console.warn("Tempo inválido:", item.targetTime);
+            }
+          } else if (item.time !== undefined && item.time !== null) {
+            hoursDisplay = item.time;
+          }
+          
+          return (
+            <List.Item>
+              <strong>{item.subject}</strong> - {hoursDisplay} horas
+              <Button type="link" danger onClick={() => handleRemoveSubject(item.subject)}>
+                Remover
+              </Button>
+            </List.Item>
+          );
+        }}
       />
       <Button type="primary" onClick={handleExportCSV} style={{ marginTop: "10px" }}>
         Exportar CSV

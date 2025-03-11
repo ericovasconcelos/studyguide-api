@@ -66,6 +66,18 @@ function generateMockRecord(index) {
   // Definir pontos de parada apenas para certos tipos de estudo
   const pontoParada = tipoEstudo === "Teoria" ? `Capítulo ${Math.floor(Math.random() * 10) + 1}` : "";
   
+  // Simular a versão do ciclo (rodada) baseado na data
+  // Dividimos os registros em 3 rodadas temporais
+  const dayOfMonth = date.getDate();
+  let versao = 1;
+  
+  // Registros mais antigos são da rodada 1, registros no meio são rodada 2, registros recentes são rodada 3
+  if (dayOfMonth > 10 && dayOfMonth <= 20) {
+    versao = 2;
+  } else if (dayOfMonth > 20) {
+    versao = 3;
+  }
+  
   return {
     id: 10800000 + index,
     tempoGasto: tempoGasto,
@@ -88,7 +100,8 @@ function generateMockRecord(index) {
     cicloAutomatizadoId: Math.floor(Math.random() * 100000) + 12000000,
     revisaoId: null,
     usuarioId: 623909,
-    cicloTexto: ciclo.texto
+    cicloTexto: ciclo.texto,
+    versao: versao  // Adicionando o campo versao para simular as rodadas
   };
 }
 
@@ -155,7 +168,9 @@ function generateMockData() {
       correctAnswers: record.totalAcerto || 0,
       studyType: record.tipoEstudo || 'Desconhecido',
       studyPeriod: record.periodoTexto || 'Desconhecido',
-      cycle: record.cicloTexto || ''
+      cycle: record.cicloTexto || '',
+      cycleId: record.cicloId || 0,
+      version: record.versao || 1  // Adicionando o campo version que vem do campo versao
     };
   });
   

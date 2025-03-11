@@ -17,7 +17,8 @@ import {
   SwapOutlined,
   FundOutlined,
   ThunderboltOutlined,
-  HistoryOutlined
+  HistoryOutlined,
+  InfoCircleOutlined
 } from "@ant-design/icons";
 
 const { Title, Text, Paragraph } = Typography;
@@ -33,6 +34,13 @@ const formatMinutesToHoursMinutes = (minutes) => {
 };
 
 export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVisible, setIsCycleModalVisible }) {
+  // Log para depuração
+  console.log("StudyDashboard recebeu:", { 
+    studyRecords: studyRecords, 
+    studyCycle: studyCycle,
+    recordsLength: studyRecords?.length || 0
+  });
+
   // Estados para filtros e comparação
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [dateRange, setDateRange] = useState(null);
@@ -41,14 +49,114 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
   const [comparisonPeriod, setComparisonPeriod] = useState("previousPeriod");
   const [activeTab, setActiveTab] = useState("1");
   const [chartView, setChartView] = useState("bar");
+  const [cycleRound, setCycleRound] = useState("all"); // Para filtrar por rodada do ciclo
 
   // Lista de matérias únicas para o filtro
   const uniqueSubjects = useMemo(() => {
     return [...new Set(studyRecords.map(record => record.subject))];
   }, [studyRecords]);
 
+  // Identificação das rodadas do ciclo de estudos, usando o campo version dos registros
+  const cycleRounds = useMemo(() => {
+    if (!studyRecords || studyRecords.length === 0) {
+      return [];
+    }
+    
+    // Agrupar os registros pelo campo version (rodada) e cicloId (para separar ciclos diferentes)
+    const roundGroups = {};
+    
+    // Percorrer todos os registros e agrupar por versão e ciclo
+    for (const record of studyRecords) {
+      // Usar os campos version e cicloId para identificar a rodada
+      const version = record.version || 1;
+      const cycleId = record.cycleId || 0;
+      const cycleName = record.cycle || "Sem ciclo";
+      
+      // Criamos uma chave combinada para agrupar por ciclo E versão
+      const groupKey = `${cycleId}-${version}`;
+      
+      if (!roundGroups[groupKey]) {
+        roundGroups[groupKey] = {
+          id: version,
+          cycleId: cycleId,
+          name: cycleName,
+          uniqueKey: groupKey,
+          records: [],
+          dates: []
+        };
+      }
+      
+      // Adicionar o registro ao grupo da sua versão + ciclo
+      roundGroups[groupKey].records.push(record);
+      
+      // Adicionar a data para determinar período do ciclo
+      if (record.date) {
+        roundGroups[groupKey].dates.push(new Date(record.date));
+      }
+    }
+    
+    // Converter para um array e ordenar
+    const roundsArray = Object.values(roundGroups);
+    
+    // Determinar data de início e fim para cada rodada
+    roundsArray.forEach(round => {
+      if (round.dates && round.dates.length > 0) {
+        // Ordenar as datas
+        round.dates.sort((a, b) => a - b);
+        
+        round.startDate = round.dates[0].toISOString();
+        round.endDate = round.dates[round.dates.length - 1].toISOString();
+        
+        // Um ciclo está "completo" se não é o mais recente
+        const isLatestRound = round.endDate === 
+          roundsArray
+            .filter(r => r.cycleId === round.cycleId) // Só comparar com rodadas do mesmo ciclo
+            .reduce((latest, r) => {
+              if (!latest) return r.endDate;
+              return new Date(r.endDate) > new Date(latest) ? r.endDate : latest;
+            }, null);
+          
+        round.isComplete = !isLatestRound;
+      }
+    });
+    
+    // Formar um nome descritivo para cada rodada
+    roundsArray.forEach(round => {
+      // Adicionar número de versão no nome só se diferente de 1
+      if (round.id > 1) {
+        round.displayName = `${round.name} (Rodada ${round.id})`;
+      } else {
+        round.displayName = round.name;
+      }
+    });
+    
+    // Ordenar por (1) data de início e (2) ID do ciclo para rodadas do mesmo dia
+    roundsArray.sort((a, b) => {
+      const dateCompare = new Date(a.startDate) - new Date(b.startDate);
+      if (dateCompare !== 0) return dateCompare;
+      return a.cycleId - b.cycleId;
+    });
+    
+    // Numerar as rodadas em ordem
+    roundsArray.forEach((round, index) => {
+      round.number = index + 1;
+    });
+    
+    console.log("Rodadas do ciclo identificadas pela versão e cicloId:", roundsArray);
+    
+    return roundsArray;
+  }, [studyRecords]);
+
   // Função para filtrar registros com base nos seletores
   const filterRecordsByPeriod = (records, subject, dates, period) => {
+    console.log("Filtrando registros:", { records, subject, dates, period });
+    
+    // Proteção contra registros nulos
+    if (!records || !Array.isArray(records)) {
+      console.error("Registros inválidos:", records);
+      return [];
+    }
+    
     let filtered = [...records];
     
     // Filtrar por matéria
@@ -57,10 +165,11 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
     }
     
     // Filtrar por intervalo de datas
-    if (dates) {
+    if (dates && dates.length === 2) {
       const [startDate, endDate] = dates;
       filtered = filtered.filter(record => {
         const recordDate = new Date(record.date);
+        console.log("Comparando datas:", { recordDate, startDate, endDate, include: recordDate >= startDate && recordDate <= endDate });
         return recordDate >= startDate && recordDate <= endDate;
       });
     }
@@ -68,7 +177,10 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
     // Filtrar por período de tempo
     if (period !== "all") {
       const today = new Date();
+      today.setHours(23, 59, 59, 999); // Final do dia atual
+      
       let compareDate = new Date();
+      compareDate.setHours(0, 0, 0, 0); // Início do dia
       
       switch (period) {
         case "week":
@@ -87,7 +199,10 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
           break;
       }
       
-      filtered = filtered.filter(record => new Date(record.date) >= compareDate);
+      filtered = filtered.filter(record => {
+        const recordDate = new Date(record.date);
+        return recordDate >= compareDate && recordDate <= today;
+      });
     }
     
     return filtered;
@@ -95,8 +210,25 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
 
   // Registros filtrados para o período atual
   const filteredRecords = useMemo(() => {
-    return filterRecordsByPeriod(studyRecords, subjectFilter, dateRange, timeFrame);
-  }, [studyRecords, subjectFilter, dateRange, timeFrame]);
+    // Primeiro aplicamos o filtro de rodada, se estiver selecionado
+    let recordsToFilter = [...studyRecords];
+    
+    if (cycleRound !== "all" && cycleRounds.length > 0) {
+      const selectedRound = cycleRounds.find(r => r.number.toString() === cycleRound);
+      if (selectedRound) {
+        // Criar um Set com IDs dos registros desta rodada para busca eficiente
+        const roundRecordIds = new Set(selectedRound.records.map(r => r.id));
+        // Filtrar apenas os registros desta rodada
+        recordsToFilter = recordsToFilter.filter(record => roundRecordIds.has(record.id));
+        console.log(`Filtro de rodada ${cycleRound} aplicado: ${recordsToFilter.length} registros`);
+      }
+    }
+    
+    // Depois aplicamos os demais filtros
+    const filtered = filterRecordsByPeriod(recordsToFilter, subjectFilter, dateRange, timeFrame);
+    console.log("Registros filtrados após todos os filtros:", filtered);
+    return filtered;
+  }, [studyRecords, subjectFilter, dateRange, timeFrame, cycleRound, cycleRounds]);
 
   // Registros filtrados para o período de comparação
   const comparisonRecords = useMemo(() => {
@@ -183,10 +315,49 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
 
   // Função para calcular métricas a partir de registros
   const calculateMetrics = (records) => {
+    if (!records || !Array.isArray(records) || records.length === 0) {
+      return {
+        totalTimeInMinutes: 0,
+        avgTimePerSession: 0,
+        totalQuestions: 0,
+        totalCorrect: 0,
+        accuracyRate: 0,
+        timeSeriesData: [],
+        streak: 0,
+        avgTimePerDay: 0,
+        studyTypeDistribution: {},
+        totalSessions: 0,
+        uniqueDays: 0
+      };
+    }
+    
     // Tempo total em minutos
     const totalTimeInMinutes = records.reduce((sum, record) => {
-      const [hours, minutes] = record.studyTime.split(":").map(Number);
-      return sum + (hours * 60 + minutes);
+      if (!record || !record.studyTime) {
+        console.warn("Registro inválido encontrado:", record);
+        return sum;
+      }
+      
+      try {
+        const parts = record.studyTime.split(":");
+        if (parts.length !== 2) {
+          console.warn("Formato de tempo inválido:", record.studyTime);
+          return sum;
+        }
+        
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1], 10);
+        
+        if (isNaN(hours) || isNaN(minutes)) {
+          console.warn("Valores de tempo não numéricos:", { hours, minutes, original: record.studyTime });
+          return sum;
+        }
+        
+        return sum + (hours * 60 + minutes);
+      } catch (error) {
+        console.error("Erro ao processar tempo de estudo:", error, record);
+        return sum;
+      }
     }, 0);
     
     // Média de tempo por sessão
@@ -211,8 +382,21 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
         acc[date] = { date, count: 0, time: 0, questions: 0, correct: 0 };
       }
       acc[date].count += 1;
-      const [hours, minutes] = record.studyTime.split(":").map(Number);
-      acc[date].time += hours * 60 + minutes;
+      
+      try {
+        const parts = record.studyTime.split(":");
+        if (parts.length === 2) {
+          const hours = parseInt(parts[0], 10);
+          const minutes = parseInt(parts[1], 10);
+          
+          if (!isNaN(hours) && !isNaN(minutes)) {
+            acc[date].time += hours * 60 + minutes;
+          }
+        }
+      } catch (e) {
+        console.warn("Erro ao processar tempo para série temporal:", e);
+      }
+      
       acc[date].questions += (record.totalExercises || 0);
       acc[date].correct += (record.correctAnswers || 0);
       return acc;
@@ -246,7 +430,7 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
         acc[type] = 0;
       }
       const [hours, minutes] = record.studyTime.split(":").map(Number);
-      acc[type] += hours * 60 + minutes;
+      acc[type] += hours * 60 + (minutes || 0);
       return acc;
     }, {});
     
@@ -277,13 +461,48 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
   }, [compareMode, comparisonRecords]);
 
   // Função para processar dados de gráficos com base em registros
-  const processChartData = (records, cycle) => {
+  const processChartData = (records, cycle, isRoundFilter = false) => {
+    if (!records || !Array.isArray(records) || records.length === 0) {
+      console.warn("Nenhum registro para processamento de gráficos:", records);
+      return {
+        studyData: [],
+        studyTypeData: [],
+        cycleProgress: [],
+        studyByDayOfWeek: Array(7).fill().map((_, i) => ({
+          name: ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][i],
+          value: 0,
+          questions: 0,
+          correct: 0,
+          sessions: 0
+        }))
+      };
+    }
+    
     // Dados de tempo por disciplina
     const studyData = records.reduce((acc, record) => {
+      if (!record || !record.subject || !record.studyTime) {
+        console.warn("Registro inválido ignorado:", record);
+        return acc;
+      }
+      
       const subject = record.subject;
       const existing = acc.find((item) => item.subject === subject);
-      const [hours, minutes] = record.studyTime.split(":").map(Number);
-      const timeInMinutes = hours * 60 + minutes;
+      
+      // Processar o tempo com tratamento seguro
+      let timeInMinutes = 0;
+      try {
+        const parts = record.studyTime.split(":");
+        if (parts.length === 2) {
+          const hours = parseInt(parts[0], 10);
+          const minutes = parseInt(parts[1], 10);
+          
+          if (!isNaN(hours) && !isNaN(minutes)) {
+            timeInMinutes = hours * 60 + minutes;
+          }
+        }
+      } catch (e) {
+        console.warn("Erro ao processar tempo para disciplina:", e);
+      }
 
       if (existing) {
         existing.studyTime += timeInMinutes;
@@ -318,19 +537,37 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
     
     // Dados de tipos de estudo
     const studyTypeData = records.reduce((acc, record) => {
+      if (!record || !record.studyTime) {
+        return acc;
+      }
+      
       const type = record.studyType || "Outros";
       const existingType = acc.find((item) => item.studyType === type);
       
+      // Processar o tempo com tratamento seguro
+      let timeInMinutes = 0;
+      try {
+        const parts = record.studyTime.split(":");
+        if (parts.length === 2) {
+          const hours = parseInt(parts[0], 10);
+          const minutes = parseInt(parts[1], 10);
+          
+          if (!isNaN(hours) && !isNaN(minutes)) {
+            timeInMinutes = hours * 60 + minutes;
+          }
+        }
+      } catch (e) {
+        console.warn("Erro ao processar tempo para tipo de estudo:", e);
+      }
+      
       if (existingType) {
         existingType.count += 1;
-        const [hours, minutes] = record.studyTime.split(":").map(Number);
-        existingType.time += hours * 60 + minutes;
+        existingType.time += timeInMinutes;
       } else {
-        const [hours, minutes] = record.studyTime.split(":").map(Number);
         acc.push({ 
           studyType: type, 
           count: 1,
-          time: hours * 60 + minutes
+          time: timeInMinutes
         });
       }
       return acc;
@@ -356,35 +593,130 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
     }));
     
     records.forEach(record => {
-      const date = new Date(record.date);
-      const dayOfWeek = date.getDay();
-      const [hours, minutes] = record.studyTime.split(":").map(Number);
-      studyByDayOfWeek[dayOfWeek].value += hours * 60 + minutes;
-      studyByDayOfWeek[dayOfWeek].questions += (record.totalExercises || 0);
-      studyByDayOfWeek[dayOfWeek].correct += (record.correctAnswers || 0);
-      studyByDayOfWeek[dayOfWeek].sessions += 1;
+      if (!record || !record.date || !record.studyTime) {
+        return;
+      }
+      
+      try {
+        const date = new Date(record.date);
+        if (isNaN(date.getTime())) {
+          console.warn("Data inválida:", record.date);
+          return;
+        }
+        
+        const dayOfWeek = date.getDay();
+        
+        // Processar o tempo com tratamento seguro
+        let timeInMinutes = 0;
+        try {
+          const parts = record.studyTime.split(":");
+          if (parts.length === 2) {
+            const hours = parseInt(parts[0], 10);
+            const minutes = parseInt(parts[1], 10);
+            
+            if (!isNaN(hours) && !isNaN(minutes)) {
+              timeInMinutes = hours * 60 + minutes;
+            }
+          }
+        } catch (e) {
+          console.warn("Erro ao processar tempo para dia da semana:", e);
+        }
+        
+        studyByDayOfWeek[dayOfWeek].value += timeInMinutes;
+        studyByDayOfWeek[dayOfWeek].questions += (record.totalExercises || 0);
+        studyByDayOfWeek[dayOfWeek].correct += (record.correctAnswers || 0);
+        studyByDayOfWeek[dayOfWeek].sessions += 1;
+      } catch (error) {
+        console.error("Erro ao processar registro para dia da semana:", error, record);
+      }
     });
     
     // Progresso do ciclo
-    const cycleProgress = cycle.map(item => {
-      const relatedRecords = records.filter(r => r.subject === item.subject);
+    const cycleProgress = Array.isArray(cycle) ? cycle.map(item => {
+      if (!item || !item.subject) {
+        console.warn("Item do ciclo inválido:", item);
+        return null;
+      }
+      
+      // Filtro mais inteligente que aceita correspondências parciais ou exatas
+      const relatedRecords = records.filter(r => {
+        if (!r || !r.subject) return false;
+        
+        // Correspondência exata (case-sensitive)
+        if (r.subject === item.subject) return true;
+        
+        // Correspondência exata (case-insensitive)
+        if (r.subject.toLowerCase() === item.subject.toLowerCase()) return true;
+        
+        // Verificar se o nome da matéria do ciclo está contido no registro
+        if (r.subject.toLowerCase().includes(item.subject.toLowerCase())) return true;
+        
+        // Verificar se o registro está contido no nome da matéria do ciclo
+        if (item.subject.toLowerCase().includes(r.subject.toLowerCase())) return true;
+        
+        // Sem correspondência
+        return false;
+      });
+      
+      console.log("Registros para", item.subject, ":", relatedRecords);
       const totalTime = relatedRecords.reduce((sum, r) => {
-        const [hours, minutes] = r.studyTime.split(":").map(Number);
-        return sum + (hours * 60 + minutes);
+        if (!r || !r.studyTime) return sum;
+        
+        // Processar o tempo com tratamento seguro
+        try {
+          const parts = r.studyTime.split(":");
+          if (parts.length === 2) {
+            const hours = parseInt(parts[0], 10);
+            const minutes = parseInt(parts[1], 10);
+            
+            if (!isNaN(hours) && !isNaN(minutes)) {
+              return sum + (hours * 60 + minutes);
+            }
+          }
+        } catch (e) {
+          console.warn("Erro ao processar tempo para progresso do ciclo:", e);
+        }
+        
+        return sum;
       }, 0);
       
       // Porcentagem de progresso estimada
-      const targetTime = item.targetTime || 600; // 10 horas em minutos como padrão se não definido
-      const progressPercent = Math.min(Math.round((totalTime / targetTime) * 100), 100);
+      // Log para depuração
+      console.log("Item do ciclo:", item, "Tempo total acumulado:", totalTime);
+      
+      // Validar o targetTime
+      let targetTime = 600; // 10 horas em minutos como padrão
+      
+      if (item.targetTime !== undefined && item.targetTime !== null) {
+        if (typeof item.targetTime === 'number' && !isNaN(item.targetTime) && item.targetTime > 0) {
+          targetTime = item.targetTime;
+        } else {
+          console.warn("Valor inválido para targetTime:", item.targetTime, "usando padrão:", targetTime);
+        }
+      } else {
+        console.warn("targetTime não definido para:", item.subject, "usando padrão:", targetTime);
+      }
+      
+      // Se estamos filtrando por rodada, a meta de tempo é por rodada, não o total acumulado
+      if (isRoundFilter) {
+        console.log(`Ajustando meta para ${item.subject} em rodada específica: meta original = ${targetTime} minutos`);
+      }
+      
+      // Calcula a porcentagem de progresso, limitando a 100% no máximo
+      const progressPercent = Math.min(Math.floor((totalTime / targetTime) * 100), 100);
+      
+      // Identificar os nomes das matérias relacionadas para exibição
+      const relatedSubjects = [...new Set(relatedRecords.map(r => r.subject))];
       
       return {
         subject: item.subject,
         totalTime,
         targetTime,
         progressPercent,
-        displayTime: formatMinutesToHoursMinutes(totalTime)
+        displayTime: formatMinutesToHoursMinutes(totalTime),
+        relatedSubjects: relatedSubjects.length > 0 ? relatedSubjects : null
       };
-    });
+    }).filter(Boolean) : [];
     
     return {
       studyData,
@@ -396,14 +728,27 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
 
   // Dados para os gráficos do período atual
   const chartData = useMemo(() => {
-    return processChartData(filteredRecords, studyCycle);
-  }, [filteredRecords, studyCycle]);
+    // O filtro de rodada já foi aplicado aos registros filtrados
+    // Precisamos apenas ajustar o cálculo do progresso quando estamos em uma rodada específica
+    const isRoundFilter = cycleRound !== "all";
+    
+    // Processa os dados usando os registros já filtrados
+    const data = processChartData(filteredRecords, studyCycle, isRoundFilter);
+    
+    if (isRoundFilter) {
+      console.log("Dados dos gráficos processados para rodada específica:", data);
+    } else {
+      console.log("Dados dos gráficos processados (todas rodadas):", data);
+    }
+    
+    return data;
+  }, [filteredRecords, studyCycle, cycleRound]);
 
   // Dados para os gráficos do período de comparação
   const comparisonChartData = useMemo(() => {
     if (!compareMode || comparisonRecords.length === 0) return null;
-    return processChartData(comparisonRecords, studyCycle);
-  }, [compareMode, comparisonRecords, studyCycle]);
+    return processChartData(comparisonRecords, studyCycle, cycleRound !== "all");
+  }, [compareMode, comparisonRecords, studyCycle, cycleRound]);
 
   // Dados para comparação combinada
   const combinedChartData = useMemo(() => {
@@ -515,9 +860,26 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
       dataIndex: "studyTime", 
       key: "studyTime",
       sorter: (a, b) => {
-        const [aHours, aMinutes] = a.studyTime.split(":").map(Number);
-        const [bHours, bMinutes] = b.studyTime.split(":").map(Number);
-        return (aHours * 60 + aMinutes) - (bHours * 60 + bMinutes);
+        try {
+          const getMinutes = (timeStr) => {
+            if (!timeStr) return 0;
+            
+            const parts = timeStr.split(":");
+            if (parts.length !== 2) return 0;
+            
+            const hours = parseInt(parts[0], 10);
+            const minutes = parseInt(parts[1], 10);
+            
+            if (isNaN(hours) || isNaN(minutes)) return 0;
+            
+            return hours * 60 + minutes;
+          };
+          
+          return getMinutes(a.studyTime) - getMinutes(b.studyTime);
+        } catch (e) {
+          console.warn("Erro ao ordenar por tempo:", e);
+          return 0;
+        }
       }
     },
     { 
@@ -584,6 +946,11 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
       }}>
         <Title level={2} style={{ textAlign: "center", color: "#fff", margin: 0 }}>
           <BookOutlined /> Painel de Estudos Profissional
+          {cycleRound !== "all" && (
+            <Tag color="blue" style={{ marginLeft: 10, verticalAlign: "middle", fontSize: 14 }}>
+              Rodada {cycleRound} {cycleRounds.find(r => r.number.toString() === cycleRound)?.isComplete ? '(completa)' : '(atual)'}
+            </Tag>
+          )}
         </Title>
         <Paragraph style={{ textAlign: "center", color: "#fff", opacity: 0.8, marginBottom: 0 }}>
           Analise seu desempenho, compare períodos e potencialize sua performance acadêmica
@@ -647,6 +1014,35 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
                 </Select>
               </Col>
               
+              {/* Seletor de rodada do ciclo */}
+              {cycleRounds.length > 0 && (
+                <Col xs={24} md={6}>
+                  <Text strong>Rodada do Ciclo</Text>
+                  <Select
+                    style={{ width: "100%" }}
+                    value={cycleRound}
+                    onChange={setCycleRound}
+                    placeholder="Selecione uma rodada"
+                  >
+                    <Option value="all">Todas as rodadas</Option>
+                    {cycleRounds.map(round => (
+                      <Option key={round.number} value={round.number.toString()}>
+                        {round.displayName} {round.id > 1 ? '' : `(Versão: ${round.id})`} {round.isComplete ? '(completa)' : '(atual)'}
+                      </Option>
+                    ))}
+                  </Select>
+                  {cycleRound !== "all" && cycleRounds.find(r => r.number.toString() === cycleRound) && (
+                    <div style={{ fontSize: "12px", marginTop: "5px", color: "#8c8c8c" }}>
+                      <Text type="secondary">
+                        {new Date(cycleRounds.find(r => r.number.toString() === cycleRound).startDate).toLocaleDateString()} 
+                        {" até "}
+                        {new Date(cycleRounds.find(r => r.number.toString() === cycleRound).endDate).toLocaleDateString()}
+                      </Text>
+                    </div>
+                  )}
+                </Col>
+              )}
+              
               <Col xs={24} md={6}>
                 <Text strong>Intervalo específico</Text>
                 <RangePicker 
@@ -677,6 +1073,16 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
                 message="Sem dados para comparação"
                 description="Não foram encontrados registros para o período de comparação selecionado."
                 type="warning"
+                showIcon
+                style={{ marginTop: 16 }}
+              />
+            )}
+            
+            {cycleRound !== "all" && cycleRounds.length > 0 && (
+              <Alert
+                message="Dados filtrados por rodada do ciclo"
+                description={`Você está visualizando apenas os dados da Rodada ${cycleRound}${cycleRounds.find(r => r.number.toString() === cycleRound)?.isComplete ? ' (completa)' : ' (atual)'}. Todos os gráficos e estatísticas foram ajustados para mostrar apenas os registros desta rodada.`}
+                type="info"
                 showIcon
                 style={{ marginTop: 16 }}
               />
@@ -847,7 +1253,11 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
           <Card 
             bordered={false} 
             style={{ borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.09)" }}
-            title={<span><BarChartOutlined /> Sessões por Dia da Semana</span>}
+            title={
+              <span>
+                <BarChartOutlined /> Sessões por Dia da Semana
+              </span>
+            }
             extra={
               <Radio.Group 
                 value={chartView} 
@@ -906,7 +1316,11 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
           <Card 
             bordered={false} 
             style={{ borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.09)" }}
-            title={<span><LineChartOutlined /> Tendência de Estudos</span>}
+            title={
+              <span>
+                <LineChartOutlined /> Tendência de Estudos
+              </span>
+            }
           >
             {derivedMetrics.timeSeriesData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
@@ -940,7 +1354,11 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
           <Card 
             bordered={false} 
             style={{ borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.09)" }}
-            title={<span><PieChartOutlined /> Tipos de Estudo</span>}
+            title={
+              <span>
+                <PieChartOutlined /> Tipos de Estudo
+              </span>
+            }
           >
             {chartData.studyTypeData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
@@ -976,7 +1394,11 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={compareMode ? 24 : 12}>
           <Card 
-            title={<span><BarChartOutlined /> Tempo de Estudo por Disciplina</span>}
+            title={
+              <span>
+                <BarChartOutlined /> Tempo de Estudo por Disciplina
+              </span>
+            }
             style={{ borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.09)", marginBottom: "20px" }}
             extra={
               compareMode ? (
@@ -1077,16 +1499,31 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
         {!compareMode && (
           <Col xs={24} lg={12}>
             <Card 
-              title={<span><ThunderboltOutlined /> Progresso do Ciclo de Estudos</span>}
+              title={
+                <span>
+                  <ThunderboltOutlined /> Progresso do Ciclo de Estudos
+                </span>
+              }
               style={{ borderRadius: "8px", boxShadow: "0 2px 8px rgba(0,0,0,0.09)", marginBottom: "20px" }}
             >
+                      
+              
               {chartData.cycleProgress.length > 0 ? (
                 <div style={{ height: '350px', overflowY: 'auto', paddingRight: '10px' }}>
                   {chartData.cycleProgress.map((item, index) => (
                     <div key={index} style={{ marginBottom: '20px' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
                         <Text strong>{item.subject}</Text>
-                        <Text type="secondary">{item.displayTime} / {formatMinutesToHoursMinutes(item.targetTime)}</Text>
+                        <div>
+                          <Text type="secondary">
+                            {item.displayTime} / {formatMinutesToHoursMinutes(item.targetTime)}
+                            {cycleRound !== "all" && (
+                              <Tooltip title="Os dados mostram o progresso específico desta rodada em relação à meta por rodada">
+                                <InfoCircleOutlined style={{ marginLeft: "8px", color: "#1890ff" }} />
+                              </Tooltip>
+                            )}
+                          </Text>
+                        </div>
                       </div>
                       <Progress 
                         percent={item.progressPercent} 
@@ -1095,6 +1532,7 @@ export default function StudyDashboard({ studyRecords, studyCycle, setIsModalVis
                           item.progressPercent < 70 ? '#faad14' : '#52c41a'
                         }
                         status={item.progressPercent >= 100 ? 'success' : 'active'}
+                        format={percent => percent + '%'}
                       />
                     </div>
                   ))}

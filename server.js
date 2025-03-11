@@ -228,7 +228,9 @@ app.post('/fetch-gran-data', async (req, res) => {
           correctAnswers: record.totalAcerto || 0,
           studyType: record.tipoEstudo || 'Desconhecido',
           studyPeriod: record.periodoTexto || 'Desconhecido',
-          cycle: record.cicloTexto || ''
+          cycle: record.cicloTexto || '',
+          cycleId: record.cicloId || 0,
+          version: record.versao || 1  // Adicionando o campo versao do Gran Cursos
         };
       });
       

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Button, Modal, Input, Drawer, Form, notification } from "antd";
+import { Button, Modal, Input, Drawer, Form, notification, Select } from "antd";
 import StudyForm from "./components/StudyForm";
 import StudyCycleManager from "./components/StudyCycleManager";
 import StudyDashboard from "./components/StudyDashboard";
@@ -9,6 +9,7 @@ import { ConfigProvider, Typography, Tag } from 'antd';
 import { CloudUploadOutlined, CloudDownloadOutlined, LogoutOutlined } from "@ant-design/icons";
 
 const { Text } = Typography;
+const { Option } = Select;
 
 export default function StudyTracker() {
   const [studyRecords, setStudyRecords] = useState([]);
@@ -21,11 +22,114 @@ export default function StudyTracker() {
   const [cloudKey, setCloudKey] = useState("");
   const [cloudSyncStatus, setCloudSyncStatus] = useState(isCloudSynced());
   const [lastSyncTime, setLastSyncTime] = useState(localStorage.getItem("lastCloudSync") || null);
+  
+  // Estados para controle dos filtros de ciclo e rodada
+  const [selectedCycle, setSelectedCycle] = useState(null);
+  const [cycleRounds, setCycleRounds] = useState([]);
+  const [selectedRound, setSelectedRound] = useState(null);
+
+  // Função para processar registros e extrair ciclos e rodadas
+  const processStudyRecords = (records) => {
+    // Identificar ciclos únicos nos registros e suas rodadas
+    const uniqueCycles = {};
+    const roundsByCluster = {};
+    
+    records.forEach(record => {
+      // Se tem ciclo e id
+      if (record.cycleId && record.cycle) {
+        const cycleId = record.cycleId;
+        // Armazenar ciclo único
+        if (!uniqueCycles[cycleId]) {
+          uniqueCycles[cycleId] = {
+            id: cycleId,
+            name: record.cycle
+          };
+        }
+        
+        // Armazenar versão (rodada) única
+        const version = record.version || 1;
+        const key = `${cycleId}-${version}`;
+        
+        if (!roundsByCluster[key]) {
+          roundsByCluster[key] = {
+            cycleId: cycleId,
+            cycleName: record.cycle,
+            roundId: version
+          };
+        }
+      }
+    });
+    
+    // Converter objetos para arrays
+    const cyclesList = Object.values(uniqueCycles);
+    const roundsList = Object.values(roundsByCluster);
+    
+    // Ordenar ciclos e rodadas
+    cyclesList.sort((a, b) => a.name.localeCompare(b.name));
+    roundsList.sort((a, b) => {
+      // Primário por ciclo, secundário por rodada
+      if (a.cycleId === b.cycleId) {
+        return a.roundId - b.roundId;
+      }
+      return a.cycleId - b.cycleId;
+    });
+    
+    console.log("Ciclos identificados:", cyclesList);
+    console.log("Rodadas por ciclo:", roundsList);
+    
+    return {
+      cycles: cyclesList,
+      rounds: roundsList
+    };
+  };
 
   useEffect(() => {
-    setStudyRecords(getStoredRecords());
-    const storedCycle = JSON.parse(localStorage.getItem("studyCycle")) || [];
-    setStudyCycle(storedCycle);
+    const storedRecords = getStoredRecords();
+    setStudyRecords(storedRecords);
+    
+    // Processar os registros para extrair ciclos e rodadas
+    const { cycles, rounds } = processStudyRecords(storedRecords);
+    
+    // Atualizar estados para os seletores
+    if (cycles.length > 0) {
+      setSelectedCycle(cycles[0].id.toString());
+    }
+    setCycleRounds(rounds);
+    
+    // Carregar e validar o ciclo de estudos
+    try {
+      const storedCycleRaw = localStorage.getItem("studyCycle");
+      let storedCycle = [];
+      
+      if (storedCycleRaw) {
+        const parsedCycle = JSON.parse(storedCycleRaw);
+        
+        // Verificar se é um array válido
+        if (Array.isArray(parsedCycle)) {
+          // Validar cada item do ciclo
+          storedCycle = parsedCycle.map(item => {
+            // Garantir que o targetTime seja um número
+            if (item.targetTime && typeof item.targetTime === 'number') {
+              return item; // Manter como está se for válido
+            } else {
+              console.warn("Corrigindo targetTime inválido para:", item.subject);
+              // Corrigir o item com target time inválido
+              return {
+                ...item,
+                targetTime: typeof item.targetTime === 'string' ? 
+                  parseInt(item.targetTime, 10) : 600 // 10 horas em minutos como padrão
+              };
+            }
+          });
+        }
+      }
+      
+      console.log("Ciclo de estudos carregado:", storedCycle);
+      setStudyCycle(storedCycle);
+    } catch (error) {
+      console.error("Erro ao carregar ciclo de estudos:", error);
+      setStudyCycle([]);
+    }
     
     // Verifica se já existe sincronização com a nuvem
     if (isCloudSynced()) {
@@ -85,17 +189,71 @@ export default function StudyTracker() {
       });
       
       // Fechar notificação de carregamento
-      notification.close('loading-notification');
+      notification.destroy('loading-notification');
       
       if (response.data && response.data.studyRecords) {
-        const newRecords = response.data.studyRecords.map((record) => ({
-          date: record.date,
-          subject: record.subject,
-          studyTime: `${Math.floor(record.studyTime / 3600)}:${Math.floor((record.studyTime % 3600) / 60)}`,
-          totalExercises: record.totalExercises || 0,
-          correctAnswers: record.correctAnswers || 0,
-          studyType: record.studyType || "Desconhecido"
-        }));
+        // Log para debug
+        console.log("Dados recebidos da API:", response.data.studyRecords);
+        
+        const newRecords = response.data.studyRecords.map(record => {
+          // Verificar e formatar o tempo corretamente
+          let formattedStudyTime = "0:00";
+          
+          if (record.studyTime !== undefined && record.studyTime !== null) {
+            // Verificar se já está no formato "hh:mm"
+            if (typeof record.studyTime === 'string' && record.studyTime.includes(':')) {
+              // O formato já é correto, vamos apenas validar
+              const parts = record.studyTime.split(':');
+              if (parts.length === 2 && !isNaN(parseInt(parts[0])) && !isNaN(parseInt(parts[1]))) {
+                formattedStudyTime = record.studyTime;
+                console.log("Mantendo formato original de tempo:", record.studyTime);
+              } else {
+                console.warn("Formato de tempo inválido:", record.studyTime);
+              }
+            } else {
+              // Converter de segundos para "hh:mm"
+              const studyTimeValue = typeof record.studyTime === 'string' ? 
+                parseInt(record.studyTime, 10) : record.studyTime;
+                
+              if (!isNaN(studyTimeValue)) {
+                const hours = Math.floor(studyTimeValue / 3600);
+                const minutes = Math.floor((studyTimeValue % 3600) / 60);
+                formattedStudyTime = `${hours}:${String(minutes).padStart(2, '0')}`;
+                console.log("Convertendo tempo de segundos:", record.studyTime, "->", formattedStudyTime);
+              } else {
+                console.warn("Valor de tempo não numérico:", record.studyTime);
+              }
+            }
+          }
+          
+          // Garantir que a data esteja em um formato válido
+          let validDate = record.date;
+          try {
+            // Verificar se a data é válida
+            const dateObj = new Date(record.date);
+            if (isNaN(dateObj.getTime())) {
+              // Se for inválida, usar a data atual como fallback
+              validDate = new Date().toISOString();
+            }
+          } catch (e) {
+            console.warn("Erro ao validar data:", e);
+            validDate = new Date().toISOString();
+          }
+          
+          return {
+            id: record.id,
+            date: validDate,
+            subject: record.subject || "Sem disciplina",
+            studyTime: formattedStudyTime,
+            totalExercises: record.totalExercises || 0,
+            correctAnswers: record.correctAnswers || 0,
+            studyType: record.studyType || "Desconhecido",
+            studyPeriod: record.studyPeriod || "Desconhecido",
+            cycle: record.cycle || "",
+            cycleId: record.cycleId || 0,
+            version: record.version || 1 // Manter a informação de versão (rodada)
+          };
+        });
 
         // Remover duplicatas comparando os registros pelo ID e data
         const uniqueRecords = newRecords.filter(newRecord =>
@@ -105,6 +263,24 @@ export default function StudyTracker() {
         );
 
         const updatedRecords = [...studyRecords, ...uniqueRecords];
+        
+        // Log para debug dos dados
+        console.log("Dados recebidos do Gran Cursos:", {
+          originalData: response.data,
+          processedRecords: newRecords,
+          uniqueRecords: uniqueRecords,
+          updatedState: updatedRecords
+        });
+        
+        // Processar os registros para atualizar ciclos e rodadas
+        const { cycles, rounds } = processStudyRecords(updatedRecords);
+        setCycleRounds(rounds);
+        
+        // Se não houver ciclo selecionado ainda e temos ciclos, selecione o primeiro
+        if (!selectedCycle && cycles.length > 0) {
+          setSelectedCycle(cycles[0].id.toString());
+        }
+        
         setStudyRecords(updatedRecords);
         saveStudyRecord(updatedRecords);
         notification.success({
@@ -121,7 +297,7 @@ export default function StudyTracker() {
       }
     } catch (error) {
       // Fechar notificação de carregamento
-      notification.close('loading-notification');
+      notification.destroy('loading-notification');
       
       console.error("Erro ao importar dados do Gran Cursos:", error);
       
@@ -155,7 +331,7 @@ export default function StudyTracker() {
             size="small" 
             onClick={() => {
               // Usar dados simulados
-              notification.close('error-notification');
+              notification.destroy('error-notification');
               handleMockData();
             }}
           >
@@ -182,14 +358,63 @@ export default function StudyTracker() {
         const mockResponse = generateMockGranData();
         
         if (mockResponse && mockResponse.studyRecords) {
-          const newRecords = mockResponse.studyRecords.map((record) => ({
-            date: record.date,
-            subject: record.subject,
-            studyTime: `${Math.floor(record.studyTime / 3600)}:${Math.floor((record.studyTime % 3600) / 60)}`,
-            totalExercises: record.totalExercises || 0,
-            correctAnswers: record.correctAnswers || 0,
-            studyType: record.studyType || "Desconhecido"
-          }));
+          // Log para debug dos dados simulados
+          console.log("Dados simulados gerados:", mockResponse.studyRecords);
+          
+          const newRecords = mockResponse.studyRecords.map(record => {
+            // Verificar e formatar o tempo corretamente
+            let formattedStudyTime = "0:00";
+            
+            if (record.studyTime !== undefined && record.studyTime !== null) {
+              // Verificar se já está no formato "hh:mm"
+              if (typeof record.studyTime === 'string' && record.studyTime.includes(':')) {
+                // O formato já é correto, vamos apenas validar
+                const parts = record.studyTime.split(':');
+                if (parts.length === 2 && !isNaN(parseInt(parts[0])) && !isNaN(parseInt(parts[1]))) {
+                  formattedStudyTime = record.studyTime;
+                  console.log("Mantendo formato original de tempo (simulado):", record.studyTime);
+                } else {
+                  console.warn("Formato de tempo inválido (simulado):", record.studyTime);
+                }
+              } else {
+                // Converter de segundos para "hh:mm"
+                const studyTimeValue = typeof record.studyTime === 'string' ? 
+                  parseInt(record.studyTime, 10) : record.studyTime;
+                  
+                if (!isNaN(studyTimeValue)) {
+                  const hours = Math.floor(studyTimeValue / 3600);
+                  const minutes = Math.floor((studyTimeValue % 3600) / 60);
+                  formattedStudyTime = `${hours}:${String(minutes).padStart(2, '0')}`;
+                  console.log("Convertendo tempo de segundos (simulado):", record.studyTime, "->", formattedStudyTime);
+                } else {
+                  console.warn("Valor de tempo não numérico (simulado):", record.studyTime);
+                }
+              }
+            }
+            
+            // Garantir que a data esteja em um formato válido
+            let validDate = record.date;
+            try {
+              // Verificar se a data é válida
+              const dateObj = new Date(record.date);
+              if (isNaN(dateObj.getTime())) {
+                // Se for inválida, usar a data atual como fallback
+                validDate = new Date().toISOString();
+              }
+            } catch (e) {
+              console.warn("Erro ao validar data em dados simulados:", e);
+              validDate = new Date().toISOString();
+            }
+            
+            return {
+              date: validDate,
+              subject: record.subject || "Sem disciplina",
+              studyTime: formattedStudyTime,
+              totalExercises: record.totalExercises || 0,
+              correctAnswers: record.correctAnswers || 0,
+              studyType: record.studyType || "Desconhecido"
+            };
+          });
 
           // Remover duplicatas
           const uniqueRecords = newRecords.filter(newRecord =>
@@ -386,22 +611,96 @@ export default function StudyTracker() {
             </a>
           </div>
           
-          <div style={{ display: "flex", gap: "10px" }}>
-            <Button type="primary" onClick={fetchGranData}>
-              Importar do Gran Cursos
-            </Button>
-            <Button onClick={handleMockData} style={{ background: "#722ed1", color: "#fff" }}>
-              Dados de Demonstração
-            </Button>
-            <Button type="default" onClick={clearStudyRecords} danger>
-              Limpar Registros
-            </Button>
+          <div style={{ marginBottom: "15px" }}>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <Button type="primary" onClick={fetchGranData}>
+                Importar do Gran Cursos
+              </Button>
+              <Button onClick={handleMockData} style={{ background: "#722ed1", color: "#fff" }}>
+                Dados de Demonstração
+              </Button>
+              <Button type="default" onClick={clearStudyRecords} danger>
+                Limpar Registros
+              </Button>
+            </div>
           </div>
+          
+          {cycleRounds.length > 0 && (
+            <div style={{ 
+              display: "flex", 
+              gap: "20px", 
+              backgroundColor: "#1e1e2f", 
+              padding: "15px", 
+              borderRadius: "5px", 
+              marginBottom: "15px" 
+            }}>
+              <div style={{ width: "50%" }}>
+                <Text strong style={{ display: "block", marginBottom: "5px", color: "#fff" }}>Ciclo de Estudos:</Text>
+                <Select 
+                  style={{ width: "100%" }} 
+                  value={selectedCycle}
+                  onChange={(value) => {
+                    setSelectedCycle(value);
+                    setSelectedRound(null); // Resetar rodada quando mudar o ciclo
+                  }}
+                >
+                  {Object.values(cycleRounds.reduce((acc, round) => {
+                    acc[round.cycleId] = {
+                      id: round.cycleId,
+                      name: round.cycleName
+                    };
+                    return acc;
+                  }, {})).map(cycle => (
+                    <Option key={cycle.id} value={cycle.id.toString()}>
+                      {cycle.name}
+                    </Option>
+                  ))}
+                </Select>
+              </div>
+              
+              <div style={{ width: "50%" }}>
+                <Text strong style={{ display: "block", marginBottom: "5px", color: "#fff" }}>Rodada (Versão):</Text>
+                <Select 
+                  style={{ width: "100%" }} 
+                  value={selectedRound} 
+                  onChange={setSelectedRound}
+                  placeholder="Selecione uma rodada"
+                >
+                  <Option value={null}>Todas as rodadas</Option>
+                  {cycleRounds
+                    .filter(round => round.cycleId.toString() === selectedCycle)
+                    .map(round => (
+                      <Option key={`${round.cycleId}-${round.roundId}`} value={round.roundId.toString()}>
+                        Rodada {round.roundId}
+                      </Option>
+                    ))
+                  }
+                </Select>
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ backgroundColor: "#1e1e2f", padding: "20px", borderRadius: "10px" }}>
           <StudyDashboard
-            studyRecords={studyRecords}
+            studyRecords={
+              // Filtrar os registros com base no ciclo e rodada selecionados
+              studyRecords.filter(record => {
+                // Se não tem ciclo selecionado, mostrar todos
+                if (!selectedCycle) return true;
+                
+                // Filtrar por ciclo
+                const matchesCycle = record.cycleId && record.cycleId.toString() === selectedCycle.toString();
+                
+                // Se não tem rodada selecionada, mostrar todos do ciclo
+                if (!selectedRound) return matchesCycle;
+                
+                // Filtrar por ciclo e rodada
+                return matchesCycle && record.version && record.version.toString() === selectedRound.toString();
+              })
+            }
+            selectedCycle={selectedCycle}
+            selectedRound={selectedRound}
             studyCycle={studyCycle}
             setIsModalVisible={setIsModalVisible}
             setIsCycleModalVisible={setIsCycleModalVisible}
