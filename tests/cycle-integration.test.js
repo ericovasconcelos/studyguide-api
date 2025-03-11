@@ -5,20 +5,22 @@
  * e gerenciamento de metas locais funcionem corretamente.
  */
 
-const axios = require('axios');
-const { expect } = require('chai');
-const sinon = require('sinon');
+// Use importações CommonJS simplificadas para testes
+import axios from 'axios';
+import chai from 'chai';
+import sinon from 'sinon';
+
+const { expect } = chai;
 
 // Importar os módulos a serem testados
-// Nota: Estes módulos serão criados posteriormente
-const { 
+import { 
   fetchCyclesFromAPI,
   mapCycleData,
   mergeCycleWithLocalGoals,
   calculateProgress,
   detectCycleRounds,
   saveLocalGoals
-} = require('../src/utils/cycleIntegration');
+} from '../src/utils/cycleIntegration';
 
 // Mock do localStorage para testes
 const localStorageMock = (() => {

@@ -38,7 +38,7 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
     if (apiToken && activeTab === 'api') {
       loadCyclesFromAPI();
     }
-  }, [apiToken, activeTab]);
+  }, [apiToken, activeTab, loadCyclesFromAPI]);
   
   // Carregar rodadas quando um ciclo é selecionado
   useEffect(() => {
@@ -48,10 +48,17 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
       setCycleRounds([]);
       setSelectedRound(null);
     }
-  }, [selectedCycleId, apiToken]);
+  }, [selectedCycleId, apiToken, loadCycleRounds]);
+  
+  // Atualizar disciplinas quando a rodada muda
+  useEffect(() => {
+    if (selectedCycleId && selectedRound && apiToken) {
+      loadSubjectsFromAPI(selectedCycleId, selectedRound);
+    }
+  }, [selectedRound, selectedCycleId, apiToken, loadSubjectsFromAPI]);
   
   // Função para carregar ciclos da API
-  const loadCyclesFromAPI = async () => {
+  const loadCyclesFromAPI = React.useCallback(async () => {
     setIsLoadingApiCycles(true);
     setErrorMessage("");
     
@@ -69,10 +76,10 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
     } finally {
       setIsLoadingApiCycles(false);
     }
-  };
+  }, [apiToken]);
   
   // Função para carregar rodadas do ciclo selecionado
-  const loadCycleRounds = async () => {
+  const loadCycleRounds = React.useCallback(async () => {
     if (!selectedCycleId) return;
     
     try {
@@ -83,20 +90,71 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
       if (rounds.length > 0) {
         setSelectedRound(rounds[0].version);
         
-        // Aqui podemos carregar as disciplinas disponíveis para este ciclo/rodada
-        // Em uma implementação real, buscaríamos da API
-        setApiSubjects([
-          { id: 33, name: "Língua Portuguesa" },
-          { id: 88, name: "Direito Civil" },
-          { id: 21, name: "Direito Constitucional" },
-          { id: 235863, name: "Raciocínio Lógico" }
-        ]);
+        // Buscar matérias da API com a estrutura correta
+        await loadSubjectsFromAPI(selectedCycleId, rounds[0].version);
       }
     } catch (error) {
       console.error("Erro ao carregar rodadas do ciclo:", error);
       setErrorMessage(`Erro ao carregar rodadas: ${error.message}`);
     }
-  };
+  }, [apiToken, selectedCycleId, loadSubjectsFromAPI]);
+  
+  // Função para buscar matérias da API
+  const loadSubjectsFromAPI = React.useCallback(async (cycleId, roundId) => {
+    try {
+      // Configurar a requisição para buscar os registros de estudo
+      const apiUrl = 'https://bj4jvnteuk.execute-api.us-east-1.amazonaws.com/v1/estudo';
+      const config = {
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json'
+        },
+        params: {
+          page: 1,
+          perPage: 100,
+          sort: 'desc'
+        }
+      };
+      
+      // Usar axios para fazer a requisição
+      const response = await axios.get(apiUrl, config);
+      
+      // Verificar se há dados válidos
+      if (!response.data?.data?.rows) {
+        throw new Error('Formato de resposta inválido');
+      }
+      
+      // Filtrar registros pelo ciclo e rodada selecionados
+      const records = response.data.data.rows.filter(record => 
+        (record.cicloId === cycleId || record.cicloId === parseInt(cycleId)) && 
+        (record.versao === roundId || record.versao === parseInt(roundId))
+      );
+      
+      // Extrair disciplinas únicas destes registros
+      const uniqueSubjects = new Map();
+      records.forEach(record => {
+        if (record.disciplinaId && record.disciplinaTexto) {
+          uniqueSubjects.set(record.disciplinaId, {
+            id: record.disciplinaId,
+            name: record.disciplinaTexto
+          });
+        }
+      });
+      
+      // Converter para array e ordenar por nome
+      const subjectsList = Array.from(uniqueSubjects.values());
+      subjectsList.sort((a, b) => a.name.localeCompare(b.name));
+      
+      console.log(`Carregadas ${subjectsList.length} disciplinas para o ciclo ${cycleId}, rodada ${roundId}`);
+      setApiSubjects(subjectsList);
+      
+      return subjectsList;
+    } catch (error) {
+      console.error("Erro ao carregar disciplinas:", error);
+      setErrorMessage(`Erro ao carregar disciplinas: ${error.message}`);
+      return [];
+    }
+  }, [apiToken]);
 
   const handleAddSubject = () => {
     if (newSubject && newTime > 0) {
