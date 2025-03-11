@@ -110,6 +110,70 @@ app.post('/verify-token', async (req, res) => {
   }
 });
 
+// Endpoint para explorar a API do Gran Cursos
+app.post('/explore-api', async (req, res) => {
+  const { token, endpoint = 'estudo', params = {} } = req.body;
+  
+  // Verificar se o token está presente
+  if (!token) {
+    return res.status(401).json({
+      error: 'Token não fornecido'
+    });
+  }
+  
+  try {
+    // Construir a URL da API com base no endpoint e parâmetros
+    let apiUrl = `https://bj4jvnteuk.execute-api.us-east-1.amazonaws.com/v1/${endpoint}`;
+    
+    // Adicionar parâmetros de consulta se existirem
+    if (Object.keys(params).length > 0) {
+      const queryParams = new URLSearchParams();
+      for (const [key, value] of Object.entries(params)) {
+        queryParams.append(key, value);
+      }
+      apiUrl += `?${queryParams.toString()}`;
+    }
+    
+    console.log(`Explorando API: ${apiUrl}`);
+    
+    // Fazer a requisição para a API do Gran Cursos
+    const response = await axios.get(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      timeout: 10000 // 10 segundos de timeout
+    });
+    
+    // Retornar os dados para análise
+    res.json({
+      success: true,
+      endpoint,
+      params,
+      data: response.data,
+      structure: {
+        keys: Object.keys(response.data || {}),
+        dataType: typeof response.data,
+        hasData: response.data?.data ? true : false,
+        dataKeys: response.data?.data ? Object.keys(response.data.data) : [],
+        sampleData: response.data?.data?.rows ? response.data.data.rows.slice(0, 2) : null
+      }
+    });
+    
+  } catch (error) {
+    console.error(`Erro ao explorar API (${endpoint}):`, error.message);
+    
+    res.status(error.response?.status || 500).json({
+      success: false,
+      error: error.message,
+      response: error.response?.data || null,
+      endpoint,
+      params
+    });
+  }
+});
+
 // Endpoint para buscar dados do Gran Cursos
 app.post('/fetch-gran-data', async (req, res) => {
   const { token } = req.body;

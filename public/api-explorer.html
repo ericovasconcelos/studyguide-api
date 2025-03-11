@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Explorer - StudyGuide</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+        }
+        .response-container {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .endpoint-badge {
+            margin-right: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">Gran Cursos API Explorer</h1>
+        
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Token de Autenticação</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="token" class="form-label">Bearer Token:</label>
+                            <input type="password" class="form-control" id="token" placeholder="Cole seu token JWT aqui">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Explorar Endpoints</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Endpoints Comuns:</label>
+                            <div>
+                                <span class="badge bg-primary endpoint-badge" onclick="setEndpoint('estudo')">estudo</span>
+                                <span class="badge bg-primary endpoint-badge" onclick="setEndpoint('ciclo-estudo')">ciclo-estudo</span>
+                                <span class="badge bg-primary endpoint-badge" onclick="setEndpoint('disciplina')">disciplina</span>
+                                <span class="badge bg-primary endpoint-badge" onclick="setEndpoint('periodo')">periodo</span>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="endpoint" class="form-label">Endpoint:</label>
+                            <input type="text" class="form-control" id="endpoint" placeholder="Nome do endpoint (ex: estudo, ciclo-estudo)">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="params" class="form-label">Parâmetros (JSON):</label>
+                            <textarea class="form-control" id="params" rows="3" placeholder='{"page": 1, "perPage": 10}'></textarea>
+                        </div>
+                        
+                        <button class="btn btn-primary" onclick="exploreApi()">Explorar API</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>Resposta da API</h5>
+                        <div>
+                            <button class="btn btn-sm btn-secondary" onclick="copyResponse()">Copiar</button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="clearResponse()">Limpar</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="response-container">
+                            <pre id="response-data">Nenhuma resposta disponível. Faça uma requisição para visualizar os dados.</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Carregar token do localStorage se disponível
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedToken = localStorage.getItem('apiExplorerToken');
+            if (savedToken) {
+                document.getElementById('token').value = savedToken;
+            }
+        });
+
+        function setEndpoint(endpoint) {
+            document.getElementById('endpoint').value = endpoint;
+            
+            // Definir parâmetros padrão com base no endpoint
+            if (endpoint === 'estudo') {
+                document.getElementById('params').value = JSON.stringify({
+                    page: 1,
+                    perPage: 10,
+                    sort: 'desc'
+                }, null, 2);
+            } else if (endpoint === 'ciclo-estudo') {
+                document.getElementById('params').value = JSON.stringify({
+                    page: 1,
+                    perPage: 10
+                }, null, 2);
+            } else {
+                document.getElementById('params').value = '{}';
+            }
+        }
+
+        async function exploreApi() {
+            const token = document.getElementById('token').value.trim();
+            const endpoint = document.getElementById('endpoint').value.trim();
+            let params = {};
+            
+            try {
+                params = JSON.parse(document.getElementById('params').value);
+            } catch (error) {
+                alert('Erro ao analisar os parâmetros JSON. Verifique o formato.');
+                return;
+            }
+            
+            if (!token) {
+                alert('Por favor, forneça um token de autenticação.');
+                return;
+            }
+            
+            if (!endpoint) {
+                alert('Por favor, forneça um endpoint para explorar.');
+                return;
+            }
+            
+            // Salvar token no localStorage para conveniência
+            localStorage.setItem('apiExplorerToken', token);
+            
+            // Mostrar mensagem de carregamento
+            document.getElementById('response-data').textContent = 'Carregando...';
+            
+            try {
+                const response = await fetch('/explore-api', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        token,
+                        endpoint,
+                        params
+                    })
+                });
+                
+                const data = await response.json();
+                document.getElementById('response-data').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('response-data').textContent = `Erro: ${error.message}`;
+            }
+        }
+
+        function copyResponse() {
+            const responseText = document.getElementById('response-data').textContent;
+            navigator.clipboard.writeText(responseText)
+                .then(() => alert('Resposta copiada para a área de transferência!'))
+                .catch(err => alert('Erro ao copiar: ' + err));
+        }
+
+        function clearResponse() {
+            document.getElementById('response-data').textContent = 'Nenhuma resposta disponível. Faça uma requisição para visualizar os dados.';
+        }
+    </script>
+</body>
+</html>
