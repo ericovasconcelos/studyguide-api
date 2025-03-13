@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 /**
  * Servidor API para StudyGuide
  * 
