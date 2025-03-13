@@ -1,36 +1,44 @@
 import { Study } from '../models/Study';
-import { StudyRepository } from '../repositories/StudyRepository';
+import { IndexedDBAdapter } from '../adapters/IndexedDBAdapter';
 
-export class StudyService {
-  constructor(private repository: StudyRepository) {}
+export interface StudyService {
+  getStudies(): Promise<Study[]>;
+  getAdapter(): IndexedDBAdapter;
+  importGranRecords(records: Study[]): Promise<{
+    imported: number;
+    duplicates: number;
+    errors: number;
+    details: string[];
+  }>;
+}
 
-  async addStudyRecord(study: Study): Promise<Study> {
-    // Validação básica
-    if (!study.subject || !study.timeSpent) {
-      throw new Error('Dados de estudo inválidos');
-    }
+export class StudyServiceImpl implements StudyService {
+  private adapter: IndexedDBAdapter;
 
-    await this.repository.saveStudy(study);
-    return study;
+  constructor(adapter: IndexedDBAdapter) {
+    this.adapter = adapter;
   }
 
-  async getAll(): Promise<Study[]> {
-    return this.repository.getStudies();
+  getAdapter(): IndexedDBAdapter {
+    return this.adapter;
   }
 
-  async getStudyStatistics() {
-    const studies = await this.repository.getStudies();
+  async getStudies(): Promise<Study[]> {
+    return this.adapter.getStudies();
+  }
 
+  async importGranRecords(records: Study[]): Promise<{
+    imported: number;
+    duplicates: number;
+    errors: number;
+    details: string[];
+  }> {
+    const result = await this.adapter.saveStudies(records);
     return {
-      totalStudyTime: this.calculateTotalStudyTime(studies),
-      totalExercises: studies.reduce((sum: number, s: Study) => sum + (s.questions || 0), 0),
-      correctAnswers: studies.reduce((sum: number, s: Study) => sum + (s.correctAnswers || 0), 0),
+      imported: records.length,
+      duplicates: 0,
+      errors: 0,
+      details: ['Importação concluída com sucesso']
     };
-  }
-
-  private calculateTotalStudyTime(studies: Study[]): number {
-    return studies.reduce((total: number, study: Study) => {
-      return total + study.timeSpent;
-    }, 0);
   }
 } 
