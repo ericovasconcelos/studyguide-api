@@ -21,11 +21,15 @@ export function useStudies(service: StudyService) {
 
   const addStudy = async (study: Study) => {
     try {
-      await service.addStudy(study);
-      await loadStudies(); // Recarrega os estudos após adicionar
+      const result = await service.addStudy(study);
+      if (result.success) {
+        await loadStudies(); // Recarrega os estudos após adicionar
+      }
+      return result;
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Erro ao adicionar estudo'));
-      throw err;
+      const error = err instanceof Error ? err : new Error('Erro ao adicionar estudo');
+      setError(error);
+      return { success: false, error: error.message };
     }
   };
 

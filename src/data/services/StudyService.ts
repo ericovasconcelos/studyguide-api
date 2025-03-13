@@ -5,7 +5,7 @@ import { ServerSyncAdapter } from '../adapters/ServerSyncAdapter';
 export interface StudyService {
   getStudies(): Promise<Study[]>;
   getAdapter(): IndexedDBAdapter;
-  addStudy(study: Study): Promise<void>;
+  addStudy(study: Study): Promise<{ success: boolean; error?: string }>;
   importGranRecords(records: Study[]): Promise<{
     imported: number;
     duplicates: number;
@@ -43,12 +43,22 @@ export class StudyServiceImpl implements StudyService {
     return localStudies;
   }
 
-  async addStudy(study: Study): Promise<void> {
-    // Salvar localmente
-    await this.adapter.saveStudy(study);
-    
-    // Sincronizar com o servidor
-    await this.syncWithServer();
+  async addStudy(study: Study): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Salvar localmente
+      await this.adapter.saveStudy(study);
+      
+      // Sincronizar com o servidor
+      await this.syncWithServer();
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao adicionar estudo:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Erro ao adicionar estudo'
+      };
+    }
   }
 
   async importGranRecords(records: Study[]): Promise<{
