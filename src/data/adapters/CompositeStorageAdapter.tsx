@@ -6,9 +6,9 @@ import { Study } from '../models/Study';
 import { StudyCycle } from '../models/StudyCycle';
 
 export class CompositeStorageAdapter implements StorageAdapter {
-  private primaryStorage: IndexedDBAdapter;
-  private cacheStorage: LocalStorageAdapter;
-  private syncAdapter: ServerSyncAdapter;
+  private readonly primaryStorage: IndexedDBAdapter;
+  private readonly cacheStorage: StorageAdapter;
+  private readonly syncAdapter: ServerSyncAdapter;
   private isSyncing: boolean = false;
   private autoSyncInterval: number | null = null;
 
@@ -83,11 +83,11 @@ export class CompositeStorageAdapter implements StorageAdapter {
     const mergedCycles = this.mergeArrays<StudyCycle>(localCycles, serverChanges.cycles, 'id');
     
     // Update both storages
-    await this.primaryStorage.bulkSaveStudies(mergedStudies);
-    await this.primaryStorage.bulkSaveCycles(mergedCycles);
+    await this.primaryStorage.saveStudies(mergedStudies);
+    await this.primaryStorage.saveStudyCycles(mergedCycles);
     
-    await this.cacheStorage.bulkSaveStudies(mergedStudies);
-    await this.cacheStorage.bulkSaveCycles(mergedCycles);
+    await this.cacheStorage.saveStudies(mergedStudies);
+    await this.cacheStorage.saveStudyCycles(mergedCycles);
   }
 
   private mergeArrays<T extends { id?: string | number }>(local: T[], server: T[], idField: keyof T): T[] {
@@ -136,16 +136,16 @@ export class CompositeStorageAdapter implements StorageAdapter {
     }
   }
 
-  async bulkSaveStudies(studies: Study[]): Promise<void> {
+  async saveStudies(studies: Study[]): Promise<void> {
     try {
-      await this.primaryStorage.bulkSaveStudies(studies);
-      await this.cacheStorage.bulkSaveStudies(studies);
+      await this.primaryStorage.saveStudies(studies);
+      await this.cacheStorage.saveStudies(studies);
       if (navigator.onLine) {
         this.syncWithServer();
       }
     } catch (error) {
-      console.warn('Failed to bulk save studies to IndexedDB, saving only to localStorage:', error);
-      await this.cacheStorage.bulkSaveStudies(studies);
+      console.warn('Failed to save studies to IndexedDB, saving only to localStorage:', error);
+      await this.cacheStorage.saveStudies(studies);
     }
   }
 
@@ -188,16 +188,16 @@ export class CompositeStorageAdapter implements StorageAdapter {
     }
   }
 
-  async bulkSaveCycles(cycles: StudyCycle[]): Promise<void> {
+  async saveStudyCycles(cycles: StudyCycle[]): Promise<void> {
     try {
-      await this.primaryStorage.bulkSaveCycles(cycles);
-      await this.cacheStorage.bulkSaveCycles(cycles);
+      await this.primaryStorage.saveStudyCycles(cycles);
+      await this.cacheStorage.saveStudyCycles(cycles);
       if (navigator.onLine) {
         this.syncWithServer();
       }
     } catch (error) {
-      console.warn('Failed to bulk save cycles to IndexedDB, saving only to localStorage:', error);
-      await this.cacheStorage.bulkSaveCycles(cycles);
+      console.warn('Failed to save cycles to IndexedDB, saving only to localStorage:', error);
+      await this.cacheStorage.saveStudyCycles(cycles);
     }
   }
 
@@ -234,7 +234,10 @@ export class CompositeStorageAdapter implements StorageAdapter {
   }
 
   async getCacheStatus(): Promise<{ size: number; lastUpdated: Date }> {
-    return this.cacheStorage.getCacheStatus();
+    if (this.cacheStorage.getCacheStatus) {
+      return this.cacheStorage.getCacheStatus();
+    }
+    return { size: 0, lastUpdated: new Date() };
   }
 
   // Import methods (new)

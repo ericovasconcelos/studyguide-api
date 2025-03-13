@@ -4,7 +4,7 @@ import { StudyCycle } from '../models/StudyCycle';
 
 export class LocalStorageAdapter implements StorageAdapter {
   private readonly STUDIES_KEY = 'studies';
-  private readonly CYCLES_KEY = 'cycles';
+  private readonly CYCLES_KEY = 'studyCycles';
   private readonly LAST_UPDATE_KEY = 'lastUpdate';
 
   // Study methods
@@ -15,13 +15,20 @@ export class LocalStorageAdapter implements StorageAdapter {
 
   async saveStudy(study: Study): Promise<void> {
     const studies = await this.getStudies();
-    studies.push(study);
+    const index = studies.findIndex(s => s.id === study.id);
+    if (index >= 0) {
+      studies[index] = study;
+    } else {
+      studies.push(study);
+    }
     localStorage.setItem(this.STUDIES_KEY, JSON.stringify(studies));
     this.updateLastSync();
   }
 
-  async bulkSaveStudies(studies: Study[]): Promise<void> {
-    localStorage.setItem(this.STUDIES_KEY, JSON.stringify(studies));
+  async saveStudies(studies: Study[]): Promise<void> {
+    const existingStudies = await this.getStudies();
+    const merged = this.mergeArrays(existingStudies, studies);
+    localStorage.setItem(this.STUDIES_KEY, JSON.stringify(merged));
     this.updateLastSync();
   }
 
@@ -38,13 +45,20 @@ export class LocalStorageAdapter implements StorageAdapter {
 
   async saveStudyCycle(cycle: StudyCycle): Promise<void> {
     const cycles = await this.getStudyCycles();
-    cycles.push(cycle);
+    const index = cycles.findIndex(c => c.id === cycle.id);
+    if (index >= 0) {
+      cycles[index] = cycle;
+    } else {
+      cycles.push(cycle);
+    }
     localStorage.setItem(this.CYCLES_KEY, JSON.stringify(cycles));
     this.updateLastSync();
   }
 
-  async bulkSaveCycles(cycles: StudyCycle[]): Promise<void> {
-    localStorage.setItem(this.CYCLES_KEY, JSON.stringify(cycles));
+  async saveStudyCycles(cycles: StudyCycle[]): Promise<void> {
+    const existingCycles = await this.getStudyCycles();
+    const merged = this.mergeArrays(existingCycles, cycles);
+    localStorage.setItem(this.CYCLES_KEY, JSON.stringify(merged));
     this.updateLastSync();
   }
 
@@ -57,7 +71,6 @@ export class LocalStorageAdapter implements StorageAdapter {
   async clear(): Promise<void> {
     await this.clearStudies();
     await this.clearStudyCycles();
-    localStorage.removeItem(this.LAST_UPDATE_KEY);
   }
 
   async invalidateCache(): Promise<void> {
@@ -65,13 +78,13 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 
   async getCacheStatus(): Promise<{ size: number; lastUpdated: Date }> {
+    const lastUpdate = localStorage.getItem(this.LAST_UPDATE_KEY);
     const studies = await this.getStudies();
     const cycles = await this.getStudyCycles();
-    const lastUpdated = localStorage.getItem(this.LAST_UPDATE_KEY);
-
+    
     return {
       size: studies.length + cycles.length,
-      lastUpdated: lastUpdated ? new Date(lastUpdated) : new Date()
+      lastUpdated: lastUpdate ? new Date(lastUpdate) : new Date()
     };
   }
 
@@ -83,28 +96,29 @@ export class LocalStorageAdapter implements StorageAdapter {
   async findDuplicateStudies(studies: Study[]): Promise<Study[]> {
     const existingStudies = await this.getStudies();
     return studies.filter(newStudy => 
-      existingStudies.some(existing => 
-        existing.date === newStudy.date && 
-        existing.subject === newStudy.subject
-      )
+      existingStudies.some(existing => existing.id === newStudy.id)
     );
   }
 
   async bulkUpsertStudies(studies: Study[]): Promise<void> {
-    const existingStudies = await this.getStudies();
-    
-    // Remover duplicatas existentes
-    const filteredExisting = existingStudies.filter(existing => 
-      !studies.some(newStudy => 
-        existing.date === newStudy.date && 
-        existing.subject === newStudy.subject
-      )
-    );
+    await this.saveStudies(studies);
+  }
 
-    // Combinar estudos existentes com novos
-    const updatedStudies = [...filteredExisting, ...studies];
+  private mergeArrays<T extends { id?: string | number }>(existing: T[], incoming: T[]): T[] {
+    const merged = new Map<string | number, T>();
     
-    // Salvar usando o método existente
-    await this.bulkSaveStudies(updatedStudies);
+    existing.forEach(item => {
+      if (item.id !== undefined) {
+        merged.set(item.id, item);
+      }
+    });
+    
+    incoming.forEach(item => {
+      if (item.id !== undefined) {
+        merged.set(item.id, item);
+      }
+    });
+    
+    return Array.from(merged.values());
   }
 } 
