@@ -1,11 +1,14 @@
 import { Study } from '../models/Study';
+import { StudyCycle } from '../models/StudyCycle';
 import { IndexedDBAdapter } from '../adapters/IndexedDBAdapter';
 import { ServerSyncAdapter } from '../adapters/ServerSyncAdapter';
 
 export interface StudyService {
   getStudies(): Promise<Study[]>;
+  getStudyCycles(): Promise<StudyCycle[]>;
   getAdapter(): IndexedDBAdapter;
   addStudy(study: Study): Promise<{ success: boolean; error?: string }>;
+  addStudyCycle(cycle: StudyCycle): Promise<{ success: boolean; error?: string }>;
   importGranRecords(records: Study[]): Promise<{
     imported: number;
     duplicates: number;
@@ -43,6 +46,19 @@ export class StudyServiceImpl implements StudyService {
     return localStudies;
   }
 
+  async getStudyCycles(): Promise<StudyCycle[]> {
+    // Primeiro tenta buscar do IndexedDB
+    const localCycles = await this.adapter.getStudyCycles();
+    
+    // Se não houver dados locais, tenta sincronizar com o servidor
+    if (localCycles.length === 0) {
+      await this.syncWithServer();
+      return this.adapter.getStudyCycles();
+    }
+    
+    return localCycles;
+  }
+
   async addStudy(study: Study): Promise<{ success: boolean; error?: string }> {
     try {
       // Salvar localmente
@@ -57,6 +73,24 @@ export class StudyServiceImpl implements StudyService {
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Erro ao adicionar estudo'
+      };
+    }
+  }
+
+  async addStudyCycle(cycle: StudyCycle): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Salvar localmente
+      await this.adapter.saveStudyCycles([cycle]);
+      
+      // Sincronizar com o servidor
+      await this.syncWithServer();
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Erro ao adicionar ciclo:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Erro ao adicionar ciclo'
       };
     }
   }
@@ -89,6 +123,9 @@ export class StudyServiceImpl implements StudyService {
       // Salvar dados localmente
       if (serverData.studies.length > 0) {
         await this.adapter.saveStudies(serverData.studies);
+      }
+      if (serverData.cycles.length > 0) {
+        await this.adapter.saveStudyCycles(serverData.cycles);
       }
     } catch (error) {
       console.error('Erro na sincronização:', error);

@@ -1,61 +1,76 @@
-import axios from 'axios';
 import { Study } from '../models/Study';
 import { StudyCycle } from '../models/StudyCycle';
+import { IndexedDBAdapter } from './IndexedDBAdapter';
+import { API_URL } from '../config/env';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
-export interface SyncAdapter {
-  uploadChanges(changes: { studies: Study[]; cycles: StudyCycle[] }): Promise<{ timestamp: Date }>;
-  downloadChanges(since: Date): Promise<{ studies: Study[]; cycles: StudyCycle[]; timestamp: Date }>;
+interface SyncData {
+  studies: Study[];
+  cycles: StudyCycle[];
 }
 
-export class ServerSyncAdapter implements SyncAdapter {
-  private userId: string;
-  private lastSyncTimestamp: Date | null = null;
+interface SyncResponse {
+  timestamp: Date;
+  studies: Study[];
+  cycles: StudyCycle[];
+}
 
-  constructor(userId: string) {
+export class ServerSyncAdapter {
+  private primaryStorage: IndexedDBAdapter;
+  private userId: string;
+  private apiUrl: string;
+
+  constructor(primaryStorage: IndexedDBAdapter, userId: string, apiUrl: string = API_URL) {
+    this.primaryStorage = primaryStorage;
     this.userId = userId;
+    this.apiUrl = apiUrl;
   }
 
-  async uploadChanges(changes: { studies: Study[]; cycles: StudyCycle[] }): Promise<{ timestamp: Date }> {
+  async uploadChanges(data: SyncData): Promise<{ timestamp: Date }> {
     try {
-      const response = await axios.post(`${API_URL}/sync/upload`, changes, {
+      const response = await fetch(`${this.apiUrl}/sync/upload`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': this.userId
-        }
+        },
+        body: JSON.stringify({
+          userId: this.userId,
+          ...data
+        }),
       });
 
-      this.lastSyncTimestamp = new Date(response.data.timestamp);
-      return { timestamp: this.lastSyncTimestamp };
+      if (!response.ok) {
+        throw new Error('Failed to upload changes');
+      }
+
+      const result = await response.json();
+      return { timestamp: new Date(result.timestamp) };
     } catch (error) {
-      console.error('Failed to upload changes:', error);
-      throw new Error('Sync failed: Could not upload changes');
+      console.error('Error uploading changes:', error);
+      throw error;
     }
   }
 
-  async downloadChanges(since: Date): Promise<{ studies: Study[]; cycles: StudyCycle[]; timestamp: Date }> {
+  async downloadChanges(since: Date): Promise<SyncResponse> {
     try {
-      const response = await axios.get(`${API_URL}/sync/download`, {
-        params: { since: since.toISOString() },
+      const response = await fetch(`${this.apiUrl}/sync/download?since=${since.toISOString()}`, {
         headers: {
-          'X-User-Id': this.userId
-        }
+          'Content-Type': 'application/json',
+        },
       });
 
-      this.lastSyncTimestamp = new Date(response.data.timestamp);
+      if (!response.ok) {
+        throw new Error('Failed to download changes');
+      }
+
+      const result = await response.json();
       return {
-        studies: response.data.studies,
-        cycles: response.data.cycles,
-        timestamp: this.lastSyncTimestamp
+        timestamp: new Date(result.timestamp),
+        studies: result.studies || [],
+        cycles: result.cycles || []
       };
     } catch (error) {
-      console.error('Failed to download changes:', error);
-      throw new Error('Sync failed: Could not download changes');
+      console.error('Error downloading changes:', error);
+      throw error;
     }
-  }
-
-  getLastSyncTimestamp(): Date | null {
-    return this.lastSyncTimestamp;
   }
 } 
