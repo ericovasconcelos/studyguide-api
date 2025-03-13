@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button, Modal, Input, Drawer, Form, notification, Menu, Avatar, Badge } from "antd";
 import StudyForm from "./components/StudyForm";
 import StudyCycleManager from "./components/StudyCycleManager";
@@ -33,14 +33,16 @@ export default function StudyTracker() {
     studies, 
     loading: studiesLoading, 
     error: studiesError, 
-    addStudy
+    addStudy,
+    refresh: refreshStudies
   } = useStudies(studyService);
 
   const {
     cycles: studyCycle,
     loading: cyclesLoading,
     error: cyclesError,
-    updateCycles: setStudyCycle
+    updateCycles: setStudyCycle,
+    reloadCycles: refreshCycles
   } = useStudyCycles(studyCycleService);
 
   // Estados locais da UI
@@ -203,11 +205,69 @@ export default function StudyTracker() {
   const mainContentClass = `main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''} fade-in`;
 
   if (studiesLoading || cyclesLoading) {
-    return <div>Carregando...</div>;
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <h2>Carregando dados...</h2>
+      </div>
+    );
   }
 
   if (studiesError || cyclesError) {
-    return <div>Erro ao carregar dados: {studiesError?.message || cyclesError?.message}</div>;
+    const error = studiesError || cyclesError;
+    console.error('[DEBUG] Erro detalhado na aplicação:', error);
+    
+    return (
+      <div className="error-container">
+        <h2>Erro ao carregar dados</h2>
+        <p className="error-message">
+          {error?.message || 'Erro desconhecido'}
+        </p>
+        
+        {/* Mostrar detalhes do erro para debug */}
+        <div className="error-details" style={{ marginBottom: '20px', padding: '10px', background: '#f8f8f8', border: '1px solid #ddd', borderRadius: '4px', maxHeight: '200px', overflow: 'auto' }}>
+          <h3>Detalhes do erro (para diagnóstico):</h3>
+          <pre>{JSON.stringify(error, null, 2)}</pre>
+        </div>
+        
+        <div className="error-actions">
+          <Button type="primary" onClick={() => window.location.reload()}>
+            Tentar Novamente
+          </Button>
+          <Button onClick={() => {
+            // Limpa os estados de erro e recarrega apenas os dados locais
+            if (studiesError) refreshStudies();
+            if (cyclesError) refreshCycles();
+          }}>
+            Carregar Dados Locais
+          </Button>
+          <Button 
+            onClick={async () => {
+              try {
+                const response = await fetch('http://localhost:5000/sync/download?since=2023-01-01T00:00:00.000Z', {
+                  headers: { 'X-User-Id': 'user-123' }
+                });
+                const result = await response.text();
+                alert(`Teste de conexão: ${response.status} ${response.statusText}\n\nResposta: ${result.substring(0, 200)}${result.length > 200 ? '...' : ''}`);
+              } catch (err) {
+                alert(`Teste de conexão falhou: ${err instanceof Error ? err.message : String(err)}`);
+              }
+            }}
+          >
+            Testar Conexão API
+          </Button>
+        </div>
+        <div className="error-help">
+          <h3>Sugestões para resolver:</h3>
+          <ul>
+            <li>Verifique sua conexão com a internet</li>
+            <li>Certifique-se de que o servidor está rodando (npm run server)</li>
+            <li>No WSL, talvez seja necessário usar o endereço IP em vez de localhost</li>
+            <li>Verifique o console do navegador para mais detalhes sobre o erro</li>
+          </ul>
+        </div>
+      </div>
+    );
   }
 
   return (

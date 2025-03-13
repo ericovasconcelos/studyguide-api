@@ -8,10 +8,11 @@ export class IndexedDBAdapter implements StorageAdapter {
   private readonly eventEmitter: EventEmitter;
   private readonly dbName: string = 'studyguide';
   private readonly storeName: string = 'studies';
+  private dbInitPromise: Promise<void>;
 
   constructor() {
     this.eventEmitter = new EventEmitter();
-    this.initDB();
+    this.dbInitPromise = this.initDB();
   }
 
   // Método para obter o eventEmitter
@@ -51,6 +52,8 @@ export class IndexedDBAdapter implements StorageAdapter {
   }
 
   async getStudies(): Promise<Study[]> {
+    await this.dbInitPromise;
+
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not initialized'));
@@ -67,6 +70,8 @@ export class IndexedDBAdapter implements StorageAdapter {
   }
 
   async getStudyCycles(): Promise<StudyCycle[]> {
+    await this.dbInitPromise;
+
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not initialized'));
@@ -83,6 +88,8 @@ export class IndexedDBAdapter implements StorageAdapter {
   }
 
   async saveStudy(study: Study): Promise<void> {
+    await this.dbInitPromise;
+
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not initialized'));
@@ -102,6 +109,8 @@ export class IndexedDBAdapter implements StorageAdapter {
   }
 
   async saveStudies(studies: Study[]): Promise<void> {
+    await this.dbInitPromise;
+
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not initialized'));
@@ -111,22 +120,31 @@ export class IndexedDBAdapter implements StorageAdapter {
       const transaction = this.db.transaction([this.storeName], 'readwrite');
       const store = transaction.objectStore(this.storeName);
       
-      Promise.all(studies.map(study => 
-        new Promise<void>((resolveRequest, rejectRequest) => {
-          const request = store.put(study);
-          request.onsuccess = () => resolveRequest();
-          request.onerror = () => rejectRequest(request.error);
-        })
-      ))
-      .then(() => {
-        this.notifyDataChanged();
-        resolve();
-      })
-      .catch(reject);
+      let completed = 0;
+      let error: Error | null = null;
+
+      studies.forEach((study) => {
+        const request = store.put(study);
+        request.onsuccess = () => {
+          completed++;
+          if (completed === studies.length && !error) {
+            this.notifyDataChanged();
+            resolve();
+          }
+        };
+        request.onerror = () => {
+          if (!error) {
+            error = request.error;
+            reject(error);
+          }
+        };
+      });
     });
   }
 
   async saveStudyCycles(cycles: StudyCycle[]): Promise<void> {
+    await this.dbInitPromise;
+
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not initialized'));
@@ -136,22 +154,31 @@ export class IndexedDBAdapter implements StorageAdapter {
       const transaction = this.db.transaction(['studyCycles'], 'readwrite');
       const store = transaction.objectStore('studyCycles');
       
-      Promise.all(cycles.map(cycle => 
-        new Promise<void>((resolveRequest, rejectRequest) => {
-          const request = store.put(cycle);
-          request.onsuccess = () => resolveRequest();
-          request.onerror = () => rejectRequest(request.error);
-        })
-      ))
-      .then(() => {
-        this.notifyDataChanged();
-        resolve();
-      })
-      .catch(reject);
+      let completed = 0;
+      let error: Error | null = null;
+
+      cycles.forEach((cycle) => {
+        const request = store.put(cycle);
+        request.onsuccess = () => {
+          completed++;
+          if (completed === cycles.length && !error) {
+            this.notifyDataChanged();
+            resolve();
+          }
+        };
+        request.onerror = () => {
+          if (!error) {
+            error = request.error;
+            reject(error);
+          }
+        };
+      });
     });
   }
 
   async saveStudyCycle(cycle: StudyCycle): Promise<void> {
+    await this.dbInitPromise;
+
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not initialized'));
@@ -171,6 +198,8 @@ export class IndexedDBAdapter implements StorageAdapter {
   }
 
   async clearStudies(): Promise<void> {
+    await this.dbInitPromise;
+
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not initialized'));
@@ -190,6 +219,8 @@ export class IndexedDBAdapter implements StorageAdapter {
   }
 
   async clearStudyCycles(): Promise<void> {
+    await this.dbInitPromise;
+
     return new Promise((resolve, reject) => {
       if (!this.db) {
         reject(new Error('Database not initialized'));
@@ -209,18 +240,18 @@ export class IndexedDBAdapter implements StorageAdapter {
   }
 
   async clear(): Promise<void> {
-    await this.clearStudies();
-    await this.clearStudyCycles();
+    await this.dbInitPromise;
+    await Promise.all([this.clearStudies(), this.clearStudyCycles()]);
   }
 
   async findDuplicateStudies(studies: Study[]): Promise<Study[]> {
+    await this.dbInitPromise;
     const existingStudies = await this.getStudies();
-    return studies.filter(newStudy => 
-      existingStudies.some(existing => existing.id === newStudy.id)
-    );
+    return studies.filter(study => existingStudies.some(existingStudy => existingStudy.id === study.id));
   }
 
   async bulkUpsertStudies(studies: Study[]): Promise<void> {
+    await this.dbInitPromise;
     await this.saveStudies(studies);
   }
 } 

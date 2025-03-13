@@ -37,7 +37,7 @@ const API_VERSION = '1.0.0';
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
     ? process.env.RENDER_EXTERNAL_URL || 'https://studyguide-api.onrender.com'
-    : ['http://localhost:3000', 'http://localhost:5000'],
+    : ['http://localhost:3000', 'http://localhost:5000', 'http://localhost:5001', 'http://127.0.0.1:3000', 'http://127.0.0.1:5000', 'http://127.0.0.1:5001', '*'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Id'],
   credentials: true

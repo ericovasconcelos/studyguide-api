@@ -27,7 +27,7 @@ export class ImportService {
 
   private convertGranRecord(granRecord: GranStudyRecord): Study {
     // Log para debug
-    console.log('Convertendo registro:', JSON.stringify(granRecord, null, 2));
+    console.log('[DEBUG] Convertendo registro:', JSON.stringify(granRecord, null, 2));
 
     // Validar se o registro existe e tem os campos obrigatórios
     if (!granRecord || !granRecord.subject || !granRecord.date) {
@@ -44,12 +44,15 @@ export class ImportService {
         if (!isNaN(hours) && !isNaN(minutes)) {
           timeSpentMinutes = (hours * 60) + minutes;
         } else {
-          console.warn('Tempo inválido:', granRecord.studyTime);
+          console.warn('[DEBUG] Tempo inválido:', granRecord.studyTime);
         }
       } catch (error) {
-        console.warn('Erro ao converter tempo:', granRecord.studyTime, error);
+        console.warn('[DEBUG] Erro ao converter tempo:', granRecord.studyTime, error);
       }
     }
+
+    // Garantir que temos um ID único e válido
+    const id = granRecord.id ? String(granRecord.id) : `gran-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
     // Formatar a data para o formato ISO
     let date;
@@ -60,13 +63,13 @@ export class ImportService {
       }
       date = parsedDate.toISOString().split('T')[0];
     } catch (error) {
-      console.error('Erro ao converter data:', granRecord.date);
+      console.error('[DEBUG] Erro ao converter data:', granRecord.date);
       throw new Error(`Data inválida: ${granRecord.date}`);
     }
 
     // Criar o objeto Study com valores validados
     const study: Study = {
-      id: granRecord.id.toString(),
+      id, 
       date,
       subject: granRecord.subject,
       timeSpent: timeSpentMinutes,
@@ -80,7 +83,7 @@ export class ImportService {
     };
 
     // Log do objeto convertido
-    console.log('Registro convertido:', JSON.stringify(study, null, 2));
+    console.log('[DEBUG] Registro convertido:', JSON.stringify(study, null, 2));
 
     return study;
   }
