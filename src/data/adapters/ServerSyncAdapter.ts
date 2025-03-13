@@ -16,6 +16,13 @@ export class ServerSyncAdapter {
     this.userId = userId;
   }
 
+  /**
+   * Retorna o timestamp da última sincronização bem-sucedida
+   */
+  getLastSyncTimestamp(): Date | null {
+    return this.lastSyncTimestamp;
+  }
+
   private getApiBaseUrl(): string {
     // Obter a URL base do ambiente ou usar um fallback
     try {
