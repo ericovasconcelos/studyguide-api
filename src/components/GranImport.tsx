@@ -57,10 +57,12 @@ export default function GranImport() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ token }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
-        throw new Error('Erro ao buscar dados do Gran');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Erro ao buscar dados do Gran: ${response.status}`);
       }
 
       const data = await response.json() as GranApiResponse;
@@ -89,11 +91,11 @@ export default function GranImport() {
       setResult(importResult);
       setProgress(100);
 
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro desconhecido ao importar');
+    } catch (error) {
+      console.error('Erro na importação:', error);
+      setError(error instanceof Error ? error.message : 'Erro desconhecido na importação');
     } finally {
       setImporting(false);
-      setProgress(100);
     }
   };
 

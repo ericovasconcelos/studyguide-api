@@ -1,6 +1,8 @@
 export const config = {
   api: {
-    baseUrl: process.env.REACT_APP_API_URL || 'http://localhost:3000',
+    baseUrl: process.env.NODE_ENV === 'production' 
+      ? window.location.origin
+      : process.env.REACT_APP_API_URL || 'http://localhost:5000',
     endpoints: {
       fetchGranData: '/fetch-gran-data'
     }

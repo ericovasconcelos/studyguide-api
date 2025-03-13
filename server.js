@@ -33,10 +33,21 @@ const PORT = process.env.PORT || 5000;
 // Versão da API
 const API_VERSION = '1.0.0';
 
+// Configuração CORS
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? process.env.RENDER_EXTERNAL_URL || 'https://studyguide-api.onrender.com'
+    : ['http://localhost:3000', 'http://localhost:5000'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Id'],
+  credentials: true
+};
+
 // Middleware
-app.use(cors());
-app.use(bodyParser.json());
+app.use(cors(corsOptions));
 app.use(compression());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Middleware para logging de requisições
 app.use((req, res, next) => {
