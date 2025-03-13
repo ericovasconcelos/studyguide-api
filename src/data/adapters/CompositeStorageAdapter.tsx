@@ -77,10 +77,10 @@ export class CompositeStorageAdapter implements StorageAdapter {
     const localCycles = await this.primaryStorage.getStudyCycles();
     
     // Merge studies (prefer server version if conflict)
-    const mergedStudies = this.mergeArrays(localStudies, serverChanges.studies, 'id');
+    const mergedStudies = this.mergeArrays<Study>(localStudies, serverChanges.studies, 'id');
     
     // Merge cycles (prefer server version if conflict)
-    const mergedCycles = this.mergeArrays(localCycles, serverChanges.cycles, 'id');
+    const mergedCycles = this.mergeArrays<StudyCycle>(localCycles, serverChanges.cycles, 'id');
     
     // Update both storages
     await this.primaryStorage.bulkSaveStudies(mergedStudies);
@@ -90,14 +90,22 @@ export class CompositeStorageAdapter implements StorageAdapter {
     await this.cacheStorage.bulkSaveCycles(mergedCycles);
   }
 
-  private mergeArrays<T extends { id: string | number }>(local: T[], server: T[], idField: keyof T): T[] {
+  private mergeArrays<T extends { id?: string | number }>(local: T[], server: T[], idField: keyof T): T[] {
     const merged = new Map<string | number, T>();
     
     // Add all local items
-    local.forEach(item => merged.set(item[idField] as string | number, item));
+    local.forEach(item => {
+      if (item[idField] !== undefined) {
+        merged.set(item[idField] as string | number, item);
+      }
+    });
     
     // Override with server items (they take precedence)
-    server.forEach(item => merged.set(item[idField] as string | number, item));
+    server.forEach(item => {
+      if (item[idField] !== undefined) {
+        merged.set(item[idField] as string | number, item);
+      }
+    });
     
     return Array.from(merged.values());
   }

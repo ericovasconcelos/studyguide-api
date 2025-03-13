@@ -46,62 +46,25 @@ const CICLOS = [
 /**
  * Gera um registro de estudo no formato exato da API do Gran Cursos
  */
-function generateMockRecord(index) {
-  const today = new Date();
-  const randomDaysAgo = Math.floor(Math.random() * 30);
-  const date = new Date();
-  date.setDate(today.getDate() - randomDaysAgo);
-  date.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60), 0, 0);
-  
-  const formattedDate = date.toISOString().replace('Z', '').replace('T', ' ');
-  
-  const tempoGasto = Math.floor(Math.random() * 10800) + 1800; // Entre 30min e 3h30 (em segundos)
-  const totalQuestao = Math.random() > 0.3 ? Math.floor(Math.random() * 50) + 5 : null;
-  const totalAcerto = totalQuestao ? Math.floor(Math.random() * totalQuestao) : null;
-  const tipoEstudo = STUDY_TYPES[Math.floor(Math.random() * STUDY_TYPES.length)];
-  const periodo = STUDY_PERIODS[Math.floor(Math.random() * STUDY_PERIODS.length)];
-  const disciplina = SUBJECTS[Math.floor(Math.random() * SUBJECTS.length)];
-  const ciclo = CICLOS[Math.floor(Math.random() * CICLOS.length)];
-  
-  // Definir pontos de parada apenas para certos tipos de estudo
-  const pontoParada = tipoEstudo === "Teoria" ? `Capítulo ${Math.floor(Math.random() * 10) + 1}` : "";
-  
-  // Simular a versão do ciclo (rodada) baseado na data
-  // Dividimos os registros em 3 rodadas temporais
-  const dayOfMonth = date.getDate();
-  let versao = 1;
-  
-  // Registros mais antigos são da rodada 1, registros no meio são rodada 2, registros recentes são rodada 3
-  if (dayOfMonth > 10 && dayOfMonth <= 20) {
-    versao = 2;
-  } else if (dayOfMonth > 20) {
-    versao = 3;
-  }
+function generateMockRecord(id, date, subject, version = 1, cycleId = null) {
+  const timeSpent = Math.floor(Math.random() * 180) + 30; // 30 a 210 minutos
+  const questions = Math.floor(Math.random() * 50) + 10;
+  const correctAnswers = Math.floor(Math.random() * (questions + 1));
   
   return {
-    id: 10800000 + index,
-    tempoGasto: tempoGasto,
-    tempoPausa: Math.floor(Math.random() * 300),
-    dataEstudo: formattedDate,
-    dataCriacao: formattedDate,
-    dataAtualizacao: null,
-    tipoEstudo: tipoEstudo,
-    totalQuestao: totalQuestao,
-    totalAcerto: totalAcerto,
-    qtdPagina: Math.random() > 0.5 ? Math.floor(Math.random() * 30) : null,
-    assuntoTexto: null,
-    assuntoId: null,
-    pontoParada: pontoParada,
-    disciplinaTexto: disciplina.texto,
-    disciplinaId: disciplina.id,
-    cicloId: ciclo.id,
-    periodoId: periodo.id,
-    periodoTexto: periodo.texto,
-    cicloAutomatizadoId: Math.floor(Math.random() * 100000) + 12000000,
-    revisaoId: null,
-    usuarioId: 623909,
-    cicloTexto: ciclo.texto,
-    versao: versao  // Adicionando o campo versao para simular as rodadas
+    id: id.toString(),
+    date: date.toISOString(),
+    subject,
+    timeSpent,
+    questions,
+    correctAnswers,
+    source: 'Gran Cursos',
+    topic: `Tópico ${Math.floor(Math.random() * 5) + 1}`,
+    notes: '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    version,
+    cycleId
   };
 }
 
@@ -123,7 +86,7 @@ function generateMockGranResponse(page = 1, perPage = 100) {
   const startId = (page - 1) * perPage;
   
   for (let i = 0; i < thisPageCount; i++) {
-    records.push(generateMockRecord(startId + i + 1));
+    records.push(generateMockRecord(startId + i + 1, new Date(), SUBJECTS[Math.floor(Math.random() * SUBJECTS.length)]));
   }
   
   // Montar a resposta no formato exato da API
@@ -154,23 +117,23 @@ function generateMockData() {
   // Processar para o formato esperado pelo frontend
   const studyRecords = apiResponse.data.rows.map(record => {
     // Converter o tempo de estudo para o formato HH:MM
-    const tempoEstudo = record.tempoGasto || 0;
+    const tempoEstudo = record.timeSpent || 0;
     const hours = Math.floor(tempoEstudo / 3600);
     const minutes = Math.floor((tempoEstudo % 3600) / 60);
     const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     
     return {
       id: record.id || `rec-${Date.now()}`,
-      date: record.dataEstudo || new Date().toISOString(),
-      subject: record.disciplinaTexto || 'Desconhecido',
+      date: record.date || new Date().toISOString(),
+      subject: record.subject.texto || 'Desconhecido',
       studyTime: formattedTime,
-      totalExercises: record.totalQuestao || 0,
-      correctAnswers: record.totalAcerto || 0,
-      studyType: record.tipoEstudo || 'Desconhecido',
-      studyPeriod: record.periodoTexto || 'Desconhecido',
-      cycle: record.cicloTexto || '',
-      cycleId: record.cicloId || 0,
-      version: record.versao || 1  // Adicionando o campo version que vem do campo versao
+      totalExercises: record.questions || 0,
+      correctAnswers: record.correctAnswers || 0,
+      studyType: record.source || 'Desconhecido',
+      studyPeriod: record.source === 'Gran Cursos' ? STUDY_PERIODS[Math.floor(Math.random() * STUDY_PERIODS.length)].texto : 'Desconhecido',
+      cycle: record.cycleId ? CICLOS[Math.floor(Math.random() * CICLOS.length)].texto : '',
+      cycleId: record.cycleId || 0,
+      version: record.version || 1
     };
   });
   
