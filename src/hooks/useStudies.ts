@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Study } from '../data/models/Study';
-import { studyService } from '../data/config/dependencies';
+import { StudyService } from '../data/services/StudyService';
 
-export function useStudies() {
+export function useStudies(service: StudyService) {
   const [studies, setStudies] = useState<Study[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -10,7 +10,7 @@ export function useStudies() {
   const loadStudies = async () => {
     try {
       setLoading(true);
-      const data = await studyService.getStudies();
+      const data = await service.getStudies();
       setStudies(data);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Erro ao carregar estudos'));
@@ -21,7 +21,7 @@ export function useStudies() {
 
   const addStudy = async (study: Study) => {
     try {
-      await studyService.addStudy(study);
+      await service.addStudy(study);
       await loadStudies(); // Recarrega os estudos após adicionar
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Erro ao adicionar estudo'));
@@ -34,7 +34,7 @@ export function useStudies() {
     loadStudies();
 
     // Escutar mudanças nos dados
-    const eventEmitter = studyService.getAdapter().getEventEmitter();
+    const eventEmitter = service.getAdapter().getEventEmitter();
     const handleDataChanged = () => {
       loadStudies();
     };
@@ -45,7 +45,7 @@ export function useStudies() {
     return () => {
       eventEmitter.off('dataChanged', handleDataChanged);
     };
-  }, []);
+  }, [service]);
 
   return { studies, loading, error, refresh: loadStudies, addStudy };
 } 
