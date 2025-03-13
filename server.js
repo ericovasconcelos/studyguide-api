@@ -14,6 +14,9 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
 const axios = require('axios');
+const mongoose = require('mongoose');
+const compression = require('compression');
+const syncRoutes = require('./server/sync');
 
 // Importando as funções para gerar dados simulados
 const { 
@@ -31,6 +34,7 @@ const API_VERSION = '1.0.0';
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(compression());
 
 // Middleware para logging de requisições
 app.use((req, res, next) => {
@@ -52,6 +56,19 @@ const validTokens = [
 // Configuração da API do Gran Cursos
 const GRAN_API_URL = 'https://bj4jvnteuk.execute-api.us-east-1.amazonaws.com/v1/estudo';
 const DEFAULT_PER_PAGE = 100; // Configurado para buscar 100 registros por página
+
+// MongoDB Connection
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+}).then(() => {
+  console.log('MongoDB Connected');
+}).catch(err => {
+  console.error('MongoDB Connection Error:', err);
+});
+
+// Routes
+app.use('/sync', syncRoutes);
 
 // Endpoint para verificar se o token é válido
 app.post('/verify-token', async (req, res) => {
@@ -421,6 +438,51 @@ app.get('/status', async (req, res) => {
       message: 'Erro ao verificar status do servidor',
       error: error.message
     });
+  }
+});
+
+app.post('/api/studies/import', async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Token não fornecido' });
+    }
+
+    let studyRecords;
+    
+    if (token === 'test-token') {
+      // Usar dados simulados para teste
+      studyRecords = generateMockData();
+    } else {
+      // Buscar dados reais da API do Gran
+      studyRecords = await fetchGranData(token);
+    }
+
+    // Converter para o novo formato
+    const convertedRecords = studyRecords.map(record => ({
+      id: record.id || `rec-${Date.now()}`,
+      date: record.date || new Date().toISOString(),
+      subject: record.subject || 'Desconhecido',
+      timeSpent: typeof record.timeSpent === 'number' ? record.timeSpent : 0,
+      questions: record.questions || 0,
+      correctAnswers: record.correctAnswers || 0,
+      source: record.source || 'Gran Cursos',
+      topic: record.topic || '',
+      notes: record.notes || '',
+      createdAt: record.createdAt || new Date().toISOString(),
+      updatedAt: record.updatedAt || new Date().toISOString(),
+      version: record.version || 1,
+      cycleId: record.cycleId || null
+    }));
+
+    res.json({
+      success: true,
+      data: convertedRecords
+    });
+  } catch (error) {
+    console.error('Erro ao importar estudos:', error);
+    res.status(500).json({ error: 'Erro ao importar estudos' });
   }
 });
 

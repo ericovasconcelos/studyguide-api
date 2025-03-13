@@ -1,0 +1,133 @@
+{
+  "success": true,
+  "analysisReport": {
+    "cycleEndpoint": {
+      "url": "https://bj4jvnteuk.execute-api.us-east-1.amazonaws.com/v1/ciclo-estudo",
+      "structure": {
+        "totalFields": 0,
+        "fields": [],
+        "fieldStats": {}
+      },
+      "sampleData": [],
+      "potentialTimeFields": []
+    },
+    "disciplineEndpoint": {
+      "url": "https://bj4jvnteuk.execute-api.us-east-1.amazonaws.com/v1/disciplina",
+      "hasData": true,
+      "sampleData": null
+    },
+    "studyEndpoint": {
+      "url": "https://bj4jvnteuk.execute-api.us-east-1.amazonaws.com/v1/estudo",
+      "hasData": true,
+      "structure": {
+        "totalFields": 23,
+        "allFields": [
+          "id",
+          "versao",
+          "tempoGasto",
+          "tempoPausa",
+          "dataEstudo",
+          "dataCriacao",
+          "dataAtualizacao",
+          "tipoEstudo",
+          "totalQuestao",
+          "totalAcerto",
+          "qtdPagina",
+          "assuntoTexto",
+          "assuntoId",
+          "pontoParada",
+          "disciplinaTexto",
+          "disciplinaId",
+          "cicloId",
+          "periodoId",
+          "periodoTexto",
+          "cicloAutomatizadoId",
+          "revisaoId",
+          "usuarioId",
+          "cicloTexto"
+        ],
+        "cycleFields": [
+          "cicloId",
+          "cicloAutomatizadoId",
+          "cicloTexto"
+        ],
+        "versionFields": [
+          "versao"
+        ],
+        "targetFields": [
+          "tempoGasto",
+          "tempoPausa"
+        ],
+        "cicloRelations": [
+          "cicloId: 847450",
+          "cicloAutomatizadoId: 12219784",
+          "cicloTexto: teste2",
+          "cicloId: 838585",
+          "cicloAutomatizadoId: 12095192",
+          "cicloTexto: Ciclo estudos",
+          "cicloAutomatizadoId: 12170601",
+          "cicloAutomatizadoId: 12097574",
+          "cicloAutomatizadoId: 12095190",
+          "cicloAutomatizadoId: 12095196"
+        ]
+      },
+      "sampleData": [
+        {
+          "id": 10813728,
+          "versao": 3,
+          "tempoGasto": 3600,
+          "tempoPausa": 0,
+          "dataEstudo": "2025-03-11T00:26:04.000",
+          "dataCriacao": "2025-03-11T00:26:04.000",
+          "dataAtualizacao": null,
+          "tipoEstudo": "Videoaula",
+          "totalQuestao": 0,
+          "totalAcerto": 0,
+          "qtdPagina": 0,
+          "assuntoTexto": null,
+          "assuntoId": null,
+          "pontoParada": "rodada2",
+          "disciplinaTexto": "Língua Portuguesa",
+          "disciplinaId": 33,
+          "cicloId": 847450,
+          "periodoId": 3,
+          "periodoTexto": "Noite",
+          "cicloAutomatizadoId": 12219784,
+          "revisaoId": null,
+          "usuarioId": 623909,
+          "cicloTexto": "teste2"
+        },
+        {
+          "id": 10813651,
+          "versao": 1,
+          "tempoGasto": 3600,
+          "tempoPausa": null,
+          "dataEstudo": "2025-03-11T00:20:05.000",
+          "dataCriacao": "2025-03-11T00:20:05.000",
+          "dataAtualizacao": null,
+          "tipoEstudo": "Videoaula",
+          "totalQuestao": null,
+          "totalAcerto": null,
+          "qtdPagina": null,
+          "assuntoTexto": null,
+          "assuntoId": null,
+          "pontoParada": "",
+          "disciplinaTexto": "Língua Portuguesa",
+          "disciplinaId": 33,
+          "cicloId": 847450,
+          "periodoId": 3,
+          "periodoTexto": "Noite",
+          "cicloAutomatizadoId": 12219784,
+          "revisaoId": null,
+          "usuarioId": 623909,
+          "cicloTexto": "teste2"
+        }
+      ]
+    },
+    "recommendation": {
+      "hasTimeMetrics": false,
+      "suggestedApproach": "Abordagem híbrida - Manter gestão local de metas com ciclos da API",
+      "reasoning": "Não encontramos campos claros para metas de tempo no endpoint de ciclos. Recomendamos manter a capacidade de definir metas localmente, mas importar os ciclos e disciplinas da API."
+    }
+  }
+}

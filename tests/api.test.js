@@ -14,6 +14,9 @@ const {
   generateMockData, 
   generateRawMockResponse 
 } = require('../mockDataGenerator');
+const { config } = require('../src/config/env');
+const request = require('supertest');
+const app = require('../server');
 
 // Definição de um esquema para validar os dados
 const STUDY_RECORD_SCHEMA = {
@@ -33,7 +36,7 @@ const STUDY_RECORD_SCHEMA = {
 };
 
 // URL da API local
-const API_URL = 'http://localhost:5000';
+const API_URL = process.env.TEST_API_URL || config.api.baseUrl;
 
 // Token de teste válido
 const TEST_TOKEN = 'test-token-1234';
@@ -179,7 +182,7 @@ async function testFetchData() {
   
   try {
     // Testar com token válido
-    const response = await axios.post(`${API_URL}/fetch-gran-data`, {
+    const response = await axios.post(`${API_URL}${config.api.endpoints.fetchGranData}`, {
       token: TEST_TOKEN
     });
     
@@ -269,3 +272,65 @@ module.exports = {
   testFetchData,
   runAllTests
 };
+
+describe('API Tests', () => {
+  describe('POST /api/studies/import', () => {
+    it('should validate study records format', async () => {
+      const response = await request(app)
+        .post('/api/studies/import')
+        .send({ token: 'test-token' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(Array.isArray(response.body.data)).toBe(true);
+
+      // Validar formato dos registros
+      response.body.data.forEach(record => {
+        expect(record).toHaveProperty('id');
+        expect(record).toHaveProperty('date');
+        expect(record).toHaveProperty('subject');
+        expect(record).toHaveProperty('timeSpent');
+        expect(record).toHaveProperty('questions');
+        expect(record).toHaveProperty('correctAnswers');
+        expect(record).toHaveProperty('source');
+        expect(record).toHaveProperty('topic');
+        expect(record).toHaveProperty('notes');
+        expect(record).toHaveProperty('createdAt');
+        expect(record).toHaveProperty('updatedAt');
+
+        // Validar tipos dos campos
+        expect(typeof record.id).toBe('string');
+        expect(typeof record.date).toBe('string');
+        expect(typeof record.subject).toBe('string');
+        expect(typeof record.timeSpent).toBe('number');
+        expect(typeof record.questions).toBe('number');
+        expect(typeof record.correctAnswers).toBe('number');
+        expect(typeof record.source).toBe('string');
+        expect(typeof record.topic).toBe('string');
+        expect(typeof record.notes).toBe('string');
+        expect(typeof record.createdAt).toBe('string');
+        expect(typeof record.updatedAt).toBe('string');
+
+        // Validar valores
+        expect(record.timeSpent).toBeGreaterThanOrEqual(0);
+        expect(record.questions).toBeGreaterThanOrEqual(0);
+        expect(record.correctAnswers).toBeGreaterThanOrEqual(0);
+        expect(record.correctAnswers).toBeLessThanOrEqual(record.questions);
+        
+        // Validar datas
+        expect(new Date(record.date).toString()).not.toBe('Invalid Date');
+        expect(new Date(record.createdAt).toString()).not.toBe('Invalid Date');
+        expect(new Date(record.updatedAt).toString()).not.toBe('Invalid Date');
+      });
+    });
+
+    it('should require a token', async () => {
+      const response = await request(app)
+        .post('/api/studies/import')
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toBe('Token não fornecido');
+    });
+  });
+});
