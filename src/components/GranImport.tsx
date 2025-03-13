@@ -74,35 +74,62 @@ export default function GranImport() {
   
   // Mock de dados para caso nada funcione
   const generateMockData = (): GranApiResponse => {
+    // Gerar entre 10 e 20 registros de exemplo
+    const numRecords = Math.floor(Math.random() * 11) + 10; // 10-20 registros
+    const studyRecords: GranRecord[] = [];
+    
+    const subjects = [
+      "Matemática", "Português", "Direito Constitucional", "Direito Administrativo", 
+      "Física", "Química", "Informática", "Raciocínio Lógico", "História do Brasil", 
+      "Geografia", "Estatística", "Legislação"
+    ];
+    
+    const studyTypes = ["Questões", "Revisão", "Teoria", "Simulado", "Videoaula"];
+    const studyPeriods = ["Manhã", "Tarde", "Noite"];
+    const cycles = ["Ciclo 1", "Ciclo 2", "Revisão Final", "Preparatório"];
+    
+    // Data base (hoje)
+    const baseDate = new Date();
+    
+    for (let i = 0; i < numRecords; i++) {
+      // Gerar data aleatória nos últimos 30 dias
+      const date = new Date(baseDate);
+      date.setDate(date.getDate() - Math.floor(Math.random() * 30));
+      
+      // Selecionar valores aleatórios
+      const subject = subjects[Math.floor(Math.random() * subjects.length)];
+      const studyType = studyTypes[Math.floor(Math.random() * studyTypes.length)];
+      const studyPeriod = studyPeriods[Math.floor(Math.random() * studyPeriods.length)];
+      const cycle = cycles[Math.floor(Math.random() * cycles.length)];
+      
+      // Gerar tempo de estudo entre 30min e 3h
+      const hours = Math.floor(Math.random() * 3) + 1;
+      const minutes = Math.floor(Math.random() * 60);
+      const studyTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      
+      // Gerar quantidade de exercícios e acertos
+      const totalExercises = Math.floor(Math.random() * 40) + 10; // 10-50 exercícios
+      const correctAnswers = Math.floor(Math.random() * (totalExercises + 1)); // 0-totalExercises acertos
+      
+      studyRecords.push({
+        id: i + 1,
+        date: date.toISOString(),
+        subject,
+        studyTime,
+        totalExercises,
+        correctAnswers,
+        studyType,
+        studyPeriod,
+        cycle,
+        cycleId: i % 2 + 1, // Alternar entre ciclo 1 e 2
+        version: 1
+      });
+    }
+    
+    console.log(`[DEBUG] Gerados ${studyRecords.length} registros mock`);
+    
     return {
-      studyRecords: [
-        {
-          id: 1,
-          date: new Date().toISOString(),
-          subject: "Matemática",
-          studyTime: "01:30",
-          totalExercises: 20,
-          correctAnswers: 15,
-          studyType: "Questões",
-          studyPeriod: "Manhã",
-          cycle: "Ciclo 1",
-          cycleId: 1,
-          version: 1
-        },
-        {
-          id: 2,
-          date: new Date().toISOString(),
-          subject: "Português",
-          studyTime: "02:00",
-          totalExercises: 30,
-          correctAnswers: 25,
-          studyType: "Revisão",
-          studyPeriod: "Tarde",
-          cycle: "Ciclo 1",
-          cycleId: 1,
-          version: 1
-        }
-      ]
+      studyRecords
     };
   };
 
