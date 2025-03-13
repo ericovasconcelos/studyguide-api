@@ -5,6 +5,7 @@ import { ServerSyncAdapter } from '../adapters/ServerSyncAdapter';
 export interface StudyService {
   getStudies(): Promise<Study[]>;
   getAdapter(): IndexedDBAdapter;
+  addStudy(study: Study): Promise<void>;
   importGranRecords(records: Study[]): Promise<{
     imported: number;
     duplicates: number;
@@ -40,6 +41,14 @@ export class StudyServiceImpl implements StudyService {
     }
     
     return localStudies;
+  }
+
+  async addStudy(study: Study): Promise<void> {
+    // Salvar localmente
+    await this.adapter.saveStudy(study);
+    
+    // Sincronizar com o servidor
+    await this.syncWithServer();
   }
 
   async importGranRecords(records: Study[]): Promise<{

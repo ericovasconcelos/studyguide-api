@@ -19,6 +19,16 @@ export function useStudies() {
     }
   };
 
+  const addStudy = async (study: Study) => {
+    try {
+      await studyService.addStudy(study);
+      await loadStudies(); // Recarrega os estudos após adicionar
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Erro ao adicionar estudo'));
+      throw err;
+    }
+  };
+
   useEffect(() => {
     // Carregar estudos inicialmente
     loadStudies();
@@ -37,5 +47,5 @@ export function useStudies() {
     };
   }, []);
 
-  return { studies, loading, error, refresh: loadStudies };
+  return { studies, loading, error, refresh: loadStudies, addStudy };
 } 
