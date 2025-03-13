@@ -15,7 +15,7 @@ export class CompositeStorageAdapter implements StorageAdapter {
   constructor(userId: string) {
     this.primaryStorage = new IndexedDBAdapter();
     this.cacheStorage = new LocalStorageAdapter();
-    this.syncAdapter = new ServerSyncAdapter(userId);
+    this.syncAdapter = new ServerSyncAdapter(this.primaryStorage, userId);
     this.initializeSync();
     this.startAutoSync();
   }

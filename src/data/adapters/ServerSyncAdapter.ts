@@ -18,11 +18,16 @@ export class ServerSyncAdapter {
   private primaryStorage: IndexedDBAdapter;
   private userId: string;
   private apiUrl: string;
+  private lastSyncTimestamp: Date | null = null;
 
   constructor(primaryStorage: IndexedDBAdapter, userId: string, apiUrl: string = API_URL) {
     this.primaryStorage = primaryStorage;
     this.userId = userId;
     this.apiUrl = apiUrl;
+  }
+
+  getLastSyncTimestamp(): Date | null {
+    return this.lastSyncTimestamp;
   }
 
   async uploadChanges(data: SyncData): Promise<{ timestamp: Date }> {
@@ -43,7 +48,8 @@ export class ServerSyncAdapter {
       }
 
       const result = await response.json();
-      return { timestamp: new Date(result.timestamp) };
+      this.lastSyncTimestamp = new Date(result.timestamp);
+      return { timestamp: this.lastSyncTimestamp };
     } catch (error) {
       console.error('Error uploading changes:', error);
       throw error;
@@ -63,8 +69,9 @@ export class ServerSyncAdapter {
       }
 
       const result = await response.json();
+      this.lastSyncTimestamp = new Date(result.timestamp);
       return {
-        timestamp: new Date(result.timestamp),
+        timestamp: this.lastSyncTimestamp,
         studies: result.studies || [],
         cycles: result.cycles || []
       };

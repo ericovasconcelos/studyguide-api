@@ -125,15 +125,47 @@ export class IndexedDBAdapter {
     });
   }
 
-  async saveStudyCycle(cycle: StudyCycle): Promise<void> {
-    // ... código existente de salvamento ...
-    this.notifyDataChanged();
-  }
-
   async saveStudyCycles(cycles: StudyCycle[]): Promise<void> {
-    // ... código existente de salvamento ...
-    this.notifyDataChanged();
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        reject(new Error('Database not initialized'));
+        return;
+      }
+
+      const transaction = this.db.transaction(['studyCycles'], 'readwrite');
+      const store = transaction.objectStore('studyCycles');
+      const requests = cycles.map(cycle => store.put(cycle));
+
+      Promise.all(requests.map(request => 
+        new Promise<void>((resolveRequest, rejectRequest) => {
+          request.onsuccess = () => resolveRequest();
+          request.onerror = () => rejectRequest(request.error);
+        })
+      ))
+      .then(() => {
+        this.notifyDataChanged();
+        resolve();
+      })
+      .catch(reject);
+    });
   }
 
-  // ... resto do código existente ...
+  async saveStudyCycle(cycle: StudyCycle): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.db) {
+        reject(new Error('Database not initialized'));
+        return;
+      }
+
+      const transaction = this.db.transaction(['studyCycles'], 'readwrite');
+      const store = transaction.objectStore('studyCycles');
+      const request = store.put(cycle);
+
+      request.onsuccess = () => {
+        this.notifyDataChanged();
+        resolve();
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
 } 
