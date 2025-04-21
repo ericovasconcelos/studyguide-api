@@ -131,22 +131,28 @@ export class CompositeAdapter implements StorageAdapter {
     }
   }
 
-  async clearStudies(): Promise<void> {
+  async clearStudies(): Promise<Result<void>> {
     try {
-      // Limpa dados locais primeiro
-      await this.localAdapter.clearStudies();
-      
-      // Tenta limpar dados do servidor
+      // Try server first
       try {
-        await this.serverAdapter.clearStudies();
+        const serverResult = await this.serverAdapter.clearStudies();
+        if (serverResult.failed()) {
+          logger.warn(`Server clear failed: ${serverResult.getError()}`);
+        }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-        logger.warn('Falha ao limpar estudos no servidor:', errorMessage);
+        logger.warn('Server clear failed:', error instanceof Error ? error.message : 'Unknown error');
       }
+
+      // Always clear local
+      const localResult = await this.localAdapter.clearStudies();
+      if (localResult.failed()) {
+        return localResult; // Return the local error
+      }
+
+      return Result.ok(undefined);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      logger.error('Erro ao limpar estudos:', errorMessage);
-      throw new Error('Falha ao limpar estudos');
+      logger.error('Error in clearStudies', error);
+      return Result.fail(error instanceof Error ? error.message : 'Unknown error in clearStudies');
     }
   }
 

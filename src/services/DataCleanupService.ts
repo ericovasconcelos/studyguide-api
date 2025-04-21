@@ -1,4 +1,4 @@
-import { StorageAdapter } from '../data/adapters/StorageAdapter';
+import { StorageAdapter } from '../domain/interfaces/StorageAdapter';
 import { ServerSyncAdapter } from '../data/adapters/ServerSyncAdapter';
 
 export enum CleanupScope {
@@ -105,7 +105,10 @@ export class DataCleanupService {
 
   private async clearApplicationData(): Promise<void> {
     // Limpa dados da aplicação no IndexedDB
-    await this.storageAdapter.clearStudies();
+    const result = await this.storageAdapter.clearStudies();
+    if (result.failed()) {
+      throw new Error(result.getError());
+    }
   }
 
   private async clearAllLocalData(): Promise<void> {

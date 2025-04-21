@@ -19,9 +19,16 @@ StudyGuide é uma aplicação web para gerenciamento de estudos, construída seg
   - `ImportService`: Gerencia a importação de estudos
   - `AuthService`: Gerencia autenticação e autorização
 - **Result Pattern**: Sistema de tratamento de resultados
-  - `Result`: Classe base para operações que podem falhar
-  - `Result.ok()`: Cria um resultado bem-sucedido
-  - `Result.fail()`: Cria um resultado com erro
+  - **Result**: Classe base para operações que podem falhar
+  - **Encapsula o sucesso ou falha de uma operação**
+  - `Result<T>`: Tipo genérico para representar o resultado de qualquer operação com tipo T
+  - `Result.ok(value)`: Cria um resultado bem-sucedido com valor opcional
+  - `Result.fail(error)`: Cria um resultado com erro (string)
+  - `result.isSuccessful()` ou `result.succeeded()`: Verifica se o resultado foi bem-sucedido
+  - `result.failed()`: Verifica se o resultado falhou
+  - `result.getValue()`: Retorna o valor se bem-sucedido (lança exceção se falha)
+  - `result.getError()`: Retorna a mensagem de erro se falha (lança exceção se sucesso)
+  - **Convenção do Projeto**: Todas as operações que podem falhar devem retornar `Result<T>` para consistência, incluindo em todas as interfaces e implementações
 
 ### 2. Application Layer
 - **Use Cases**: Casos de uso da aplicação

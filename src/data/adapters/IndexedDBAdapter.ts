@@ -38,8 +38,27 @@ export class IndexedDBAdapter implements StorageAdapter {
     };
   }
 
-  async clearStudies(): Promise<void> {
-    return void 0;
+  async clearStudies(): Promise<Result<void>> {
+    if (!this.db) {
+      logger.error('IndexedDB not initialized');
+      return Result.fail<void>('IndexedDB not initialized');
+    }
+
+    return new Promise((resolve) => {
+      const transaction = this.db!.transaction(['studies'], 'readwrite');
+      const store = transaction.objectStore('studies');
+      const request = store.clear();
+
+      request.onsuccess = () => {
+        logger.info('Studies cleared from IndexedDB');
+        resolve(Result.ok<void>(undefined));
+      };
+
+      request.onerror = () => {
+        logger.error('Failed to clear studies from IndexedDB');
+        resolve(Result.fail<void>('Failed to clear studies from IndexedDB'));
+      };
+    });
   }
 
   async getStudies(): Promise<Result<Study[]>> {

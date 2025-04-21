@@ -187,8 +187,14 @@ export class ServerSyncAdapter implements StorageAdapter {
     await this.clearUserData();
   }
 
-  async clearStudies(): Promise<void> {
-    await this.clearUserData();
+  async clearStudies(): Promise<Result<void>> {
+    try {
+      await this.clearUserData();
+      return Result.ok(undefined);
+    } catch (error) {
+      logger.error('Error clearing studies', error);
+      return Result.fail(error instanceof Error ? error.message : 'Unknown error clearing studies');
+    }
   }
 
   async getCacheStatus(): Promise<{ size: number; lastUpdated: Date }> {

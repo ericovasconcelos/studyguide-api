@@ -123,6 +123,9 @@ export class StudyRepository implements IStudyRepository {
   }
 
   async clear(): Promise<void> {
-    await this.storage.clearStudies();
+    const result = await this.storage.clearStudies();
+    if (result.failed()) {
+      throw new Error(result.getError());
+    }
   }
 } 

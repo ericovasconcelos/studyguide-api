@@ -1,6 +1,6 @@
 import { Result } from '../../domain/result';
 import { Study } from '../../domain/entities/Study';
-import { StorageAdapter } from './StorageAdapter';
+import { StorageAdapter } from '../../domain/interfaces/StorageAdapter';
 import { logger } from '../../utils/logger';
 import { StudyCycle } from '../models/StudyCycle';
 
@@ -179,13 +179,13 @@ export class LocalStorageAdapter implements StorageAdapter {
     throw new Error('Method not implemented');
   }
 
-  async clearStudies(): Promise<void> {
+  async clearStudies(): Promise<Result<void>> {
     if (!this.db) {
       logger.error('Database not initialized before clearing studies');
-      return Promise.reject('Database not initialized');
+      return Result.fail('Database not initialized');
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       try {
         const transaction = this.db!.transaction(this.STORE_NAME, 'readwrite');
         const store = transaction.objectStore(this.STORE_NAME);
@@ -193,12 +193,12 @@ export class LocalStorageAdapter implements StorageAdapter {
 
         request.onsuccess = () => {
           logger.info('Studies cleared from IndexedDB');
-          resolve();
+          resolve(Result.ok(undefined));
         };
 
         request.onerror = () => {
           logger.error('Failed to clear studies from IndexedDB', request.error);
-          reject('Failed to clear studies');
+          resolve(Result.fail('Failed to clear studies'));
         };
 
         transaction.oncomplete = () => {
@@ -206,12 +206,12 @@ export class LocalStorageAdapter implements StorageAdapter {
         };
 
         transaction.onerror = () => {
-           logger.error('Transaction error while clearing studies', transaction.error);
-           reject('Transaction error while clearing studies');
+          logger.error('Transaction error while clearing studies', transaction.error);
+          resolve(Result.fail('Transaction error while clearing studies'));
         }
       } catch (error) {
         logger.error('Error initiating clearStudies transaction', error);
-        reject('Error initiating clearStudies transaction');
+        resolve(Result.fail('Error initiating clearStudies transaction'));
       }
     });
   }
