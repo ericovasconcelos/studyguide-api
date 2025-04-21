@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "react-app-rewired": "^2.2.1",
     "@ant-design/icons": "^6.0.0",
     "@babel/core": "^7.26.9",
     "@babel/preset-env": "^7.26.9",
@@ -31,10 +30,12 @@
     "mongoose": "^8.2.0",
     "papaparse": "^5.5.2",
     "react": "^18.2.0",
+    "react-app-rewired": "^2.2.1",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
     "recharts": "^2.15.1",
     "styled-components": "^6.1.15",
+    "typescript": "^5.8.3",
     "vercel": "^41.3.2",
     "web-vitals": "^2.1.4",
     "winston": "^3.17.0"
@@ -78,7 +79,6 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.9",
-    "@types/node": "^22.14.1",
-    "typescript": "^5.8.3"
+    "@types/node": "^22.14.1"
   }
 }
