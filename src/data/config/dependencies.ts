@@ -1,41 +1,43 @@
-import { StorageAdapter } from '../adapters/StorageAdapter';
-import { LocalStorageAdapter } from '../adapters/LocalStorageAdapter';
-import { StudyService } from '../services/StudyService';
 import { StudyCycleService } from '../services/StudyCycleService';
+import { ImportService } from '../../services/ImportService';
+import { StudyService } from '../services/StudyService';
+import { ServerSyncAdapter } from '../adapters/ServerSyncAdapter';
+import { CompositeAdapter } from '../adapters/CompositeAdapter';
+import { IndexedDBAdapter } from '../adapters/IndexedDBAdapter';
+import { LocalStorageAdapter } from '../adapters/LocalStorageAdapter';
 import { StudyRepository } from '../repositories/StudyRepository';
 import { StudyCycleRepository } from '../repositories/StudyCycleRepository';
-import { ImportService } from '../../services/ImportService';
-import { IndexedDBAdapter } from '../adapters/IndexedDBAdapter';
-import { StudyServiceImpl } from '../services/StudyService';
-import { ServerSyncAdapter } from '../adapters/ServerSyncAdapter';
-import { CompositeStorageAdapter } from '../adapters/CompositeStorageAdapter';
+import { DataCleanupService } from '../../services/DataCleanupService';
+import { logger } from '../../utils/logger';
+import { config } from '../../config/env';
+import { getCurrentUserId } from '../../config/auth';
 
-// Configuração do usuário (deve vir de um sistema de autenticação no futuro)
-const USER_ID = 'user-123';
+// Obter ID do usuário do sistema de autenticação
+const USER_ID = getCurrentUserId();
 
-// Criar instância do CompositeStorageAdapter que gerencia múltiplos adaptadores
-const compositeAdapter = new CompositeStorageAdapter(USER_ID);
+// Criar instâncias dos adaptadores
+const indexedDBAdapter = new IndexedDBAdapter();
+const serverSyncAdapter = new ServerSyncAdapter(indexedDBAdapter, USER_ID);
+const compositeAdapter = new CompositeAdapter(indexedDBAdapter, serverSyncAdapter);
 
-// Criar instâncias dos repositórios usando o mesmo adaptador composto
+// Criar instâncias dos repositórios
 const studyRepository = new StudyRepository(compositeAdapter);
 const studyCycleRepository = new StudyCycleRepository(compositeAdapter);
-
-// Criar instância do servidor de sincronização para backups remotos
-// Nota: O próprio CompositeStorageAdapter já cria um ServerSyncAdapter, mas mantemos
-// esta instância separada para o StudyService
-const serverSyncAdapter = new ServerSyncAdapter(compositeAdapter, USER_ID);
 
 // Criar instâncias dos serviços
 const studyCycleService = new StudyCycleService(studyCycleRepository);
 const importService = new ImportService(studyRepository);
-const studyService = new StudyServiceImpl(compositeAdapter, serverSyncAdapter, USER_ID);
+const studyService = new StudyService(compositeAdapter, serverSyncAdapter, USER_ID);
 
 // Exportar as dependências
 export {
-  compositeAdapter,
-  studyRepository,
-  studyCycleRepository,
   studyService,
   studyCycleService,
-  importService
+  importService,
+  studyRepository,
+  studyCycleRepository,
+  indexedDBAdapter,
+  serverSyncAdapter,
+  compositeAdapter,
+  USER_ID // Exportar o ID do usuário para uso em outros componentes
 }; 

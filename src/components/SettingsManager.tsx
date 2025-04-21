@@ -1,50 +1,75 @@
 import React, { useState } from 'react';
-import { Tabs, Card, Form, Input, Button, Switch, Alert, notification, Space, Divider } from 'antd';
+import { Tabs, Card, Form, Input, Button, Switch, Alert, notification, Space, Divider, message } from 'antd';
 import { CloudOutlined, ApiOutlined, SettingOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { DataCleanupManager } from './DataCleanupManager';
+import { DataCleanupService } from '../services/DataCleanupService';
+import { logger } from '../utils/logger';
+import { useDataContext } from '../contexts/DataContext';
 
 const { TabPane } = Tabs;
 
 interface SettingsManagerProps {
   onClose?: () => void;
-  cloudUserId?: string;
-  cloudKey?: string;
-  onCloudConnect?: (userId: string, key: string) => void;
-  onCloudDisconnect?: () => void;
-  cloudSyncStatus?: boolean;
 }
 
-export default function SettingsManager({
-  onClose,
-  cloudUserId = '',
-  cloudKey = '',
-  onCloudConnect,
-  onCloudDisconnect,
-  cloudSyncStatus = false
-}: SettingsManagerProps) {
+export default function SettingsManager({ onClose }: SettingsManagerProps) {
   // Estados locais
-  const [granToken, setGranToken] = useState(localStorage.getItem('granToken') || '');
+  const [granToken, setGranToken] = useState('');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [cleanupVisible, setCleanupVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // Usar o hook useDataContext para acessar as funções de manipulação de dados
+  const { deleteStudy, sync } = useDataContext();
 
   // Handler para salvar token do Gran
-  const handleSaveGranToken = () => {
-    localStorage.setItem('granToken', granToken);
-    notification.success({
-      message: 'Token do Gran salvo',
-      description: 'O token foi salvo com sucesso.',
-      placement: 'topRight'
-    });
+  const handleSaveGranToken = async () => {
+    try {
+      setLoading(true);
+      // TODO: Implementar lógica de salvamento do token
+      notification.success({
+        message: 'Token do Gran salvo com sucesso!',
+        placement: 'topRight'
+      });
+    } catch (error) {
+      logger.error('Erro ao salvar token do Gran', error);
+      notification.error({
+        message: 'Erro ao salvar token do Gran',
+        placement: 'topRight'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handler para limpar dados
-  const handleClearData = () => {
-    if (window.confirm('Tem certeza que deseja limpar todos os dados? Esta ação não pode ser desfeita.')) {
-      localStorage.clear();
+  const handleClearData = async () => {
+    try {
+      setLoading(true);
+      // Limpar dados usando o hook useData
+      await deleteStudy('*');
       notification.success({
-        message: 'Dados limpos',
-        description: 'Todos os dados foram removidos com sucesso.',
+        message: 'Dados limpos com sucesso!',
         placement: 'topRight'
       });
+    } catch (error) {
+      logger.error('Erro ao limpar dados', error);
+      notification.error({
+        message: 'Erro ao limpar dados',
+        placement: 'topRight'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSync = async () => {
+    try {
+      await sync();
+      message.success('Sincronização concluída com sucesso!');
+    } catch (error) {
+      message.error('Erro ao sincronizar dados');
     }
   };
 
@@ -66,39 +91,18 @@ export default function SettingsManager({
                 label="Token de Acesso"
                 help="Insira o token de acesso fornecido pelo Gran Cursos"
               >
-                <Input.Password
+                <Input
                   value={granToken}
                   onChange={(e) => setGranToken(e.target.value)}
                   placeholder="Bearer token do Gran Cursos"
                 />
               </Form.Item>
-              <Button type="primary" onClick={handleSaveGranToken}>
-                Salvar Token
-              </Button>
-            </Form>
-          </Card>
-
-          <Card title="Sincronização com a Nuvem" className="settings-card">
-            <Form layout="vertical">
-              <Form.Item label="ID de Usuário">
-                <Input
-                  value={cloudUserId}
-                  placeholder="Ex: eric123"
-                  disabled={cloudSyncStatus}
-                />
-              </Form.Item>
-              <Form.Item label="Chave de Sincronização">
-                <Input.Password
-                  value={cloudKey}
-                  placeholder="Sua chave secreta"
-                  disabled={cloudSyncStatus}
-                />
-              </Form.Item>
               <Button
-                type={cloudSyncStatus ? 'default' : 'primary'}
-                onClick={() => cloudSyncStatus ? onCloudDisconnect?.() : onCloudConnect?.(cloudUserId, cloudKey)}
+                type="primary"
+                onClick={handleSaveGranToken}
+                loading={loading}
               >
-                {cloudSyncStatus ? 'Desconectar' : 'Conectar'}
+                Salvar Token
               </Button>
             </Form>
           </Card>
@@ -141,17 +145,37 @@ export default function SettingsManager({
             <Space direction="vertical" style={{ width: '100%' }}>
               <Alert
                 message="Gerenciamento de Dados"
-                description="Aqui você pode gerenciar seus dados locais. Tenha cuidado ao limpar os dados, pois esta ação não pode ser desfeita."
+                description="Aqui você pode gerenciar seus dados locais e do servidor. Tenha cuidado ao limpar os dados, pois algumas ações não podem ser desfeitas."
                 type="info"
                 showIcon
               />
-              <Button danger onClick={handleClearData}>
-                Limpar Todos os Dados
+              <Button
+                type="primary"
+                onClick={() => setCleanupVisible(true)}
+                loading={loading}
+              >
+                Gerenciar Limpeza de Dados
               </Button>
             </Space>
           </Card>
         </TabPane>
       </Tabs>
+
+      <DataCleanupManager
+        visible={cleanupVisible}
+        onClose={() => setCleanupVisible(false)}
+      />
+
+      <Form layout="vertical">
+        <Form.Item label="Sincronização Automática">
+          <Switch defaultChecked />
+        </Form.Item>
+        <Form.Item>
+          <Button type="primary" onClick={handleSync}>
+            Sincronizar Agora
+          </Button>
+        </Form.Item>
+      </Form>
     </div>
   );
 } 

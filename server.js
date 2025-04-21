@@ -19,6 +19,7 @@ const axios = require('axios');
 const mongoose = require('mongoose');
 const compression = require('compression');
 const syncRoutes = require('./server/sync');
+const studyRoutes = require('./server/studies');
 
 // Importando as funções para gerar dados simulados
 const { 
@@ -28,7 +29,7 @@ const {
 
 // Configuração da aplicação
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3001;
 
 // Versão da API
 const API_VERSION = '1.0.0';
@@ -66,9 +67,8 @@ const validTokens = [
   'test-token-1234'                             // Token de teste
 ];
 
-// Configuração da API do Gran Cursos
-const GRAN_API_URL = 'https://bj4jvnteuk.execute-api.us-east-1.amazonaws.com/v1/estudo';
-const DEFAULT_PER_PAGE = 100; // Configurado para buscar 100 registros por página
+// Configuração da API
+const API_URL = process.env.API_URL || 'http://localhost:3000';
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI, {
@@ -82,317 +82,72 @@ mongoose.connect(process.env.MONGODB_URI, {
 
 // Routes
 app.use('/sync', syncRoutes);
+app.use('/api/studies', studyRoutes);
 
-// Endpoint para verificar se o token é válido
-app.post('/verify-token', async (req, res) => {
-  const { token } = req.body;
-  
-  // Verificar se o token está presente
-  if (!token) {
-    return res.status(401).json({
-      valid: false,
-      error: 'Token não fornecido'
-    });
-  }
-  
-  // Se for um token de teste, retornar válido
-  if (validTokens.includes(token)) {
-    return res.json({
-      valid: true,
-      message: 'Token de teste válido',
-      isMockToken: true
-    });
-  }
-  
+// Endpoint para verificar a conexão com a API
+app.get('/api/health', async (req, res) => {
   try {
-    // Tentar fazer uma requisição com o token para validar
-    const response = await axios.get(`${GRAN_API_URL}?page=1&perPage=1`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 5000 // 5 segundos de timeout para verificação
-    });
-    
-    // Se a requisição foi bem-sucedida, o token é válido
-    res.json({
-      valid: true,
-      message: 'Token válido para a API do Gran Cursos',
-      totalItems: response.data?.totalItems || 0
-    });
-    
+    const response = await axios.get(`${API_URL}/health`);
+    res.json(response.data);
   } catch (error) {
-    console.error('Erro ao verificar token:', error.message);
-    
-    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-      return res.status(401).json({
-        valid: false,
-        error: 'Token inválido ou expirado'
-      });
-    }
-    
-    // Outros erros de conexão
+    console.error('[ERROR] Falha ao conectar com a API:', error.message);
     res.status(500).json({
-      valid: false,
-      error: 'Erro ao verificar token',
-      details: error.message
+      status: 'error',
+      message: 'Falha ao conectar com a API',
+      error: error.message
     });
   }
 });
 
-// Endpoint para explorar a API do Gran Cursos
-app.post('/explore-api', async (req, res) => {
-  const { token, endpoint = 'estudo', params = {} } = req.body;
-  
-  // Verificar se o token está presente
-  if (!token) {
-    return res.status(401).json({
-      error: 'Token não fornecido'
+// Endpoint para explorar a API
+app.get('/api/explore', async (req, res) => {
+  try {
+    const response = await axios.get(`${API_URL}/explore`);
+    res.json(response.data);
+  } catch (error) {
+    console.error('[ERROR] Falha ao explorar a API:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Falha ao explorar a API',
+      error: error.message
     });
   }
-  
+});
+
+// Endpoint para diagnóstico da API
+app.get('/api/diagnostic', async (req, res) => {
   try {
-    // Construir a URL da API com base no endpoint e parâmetros
-    let apiUrl = `https://bj4jvnteuk.execute-api.us-east-1.amazonaws.com/v1/${endpoint}`;
+    console.log('[DIAGNOSTIC] Iniciando diagnóstico da API');
     
-    // Adicionar parâmetros de consulta se existirem
-    if (Object.keys(params).length > 0) {
-      const queryParams = new URLSearchParams();
-      for (const [key, value] of Object.entries(params)) {
-        queryParams.append(key, value);
-      }
-      apiUrl += `?${queryParams.toString()}`;
-    }
-    
-    console.log(`Explorando API: ${apiUrl}`);
-    
-    // Fazer a requisição para a API do Gran Cursos
-    const response = await axios.get(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      timeout: 10000 // 10 segundos de timeout
-    });
-    
-    // Retornar os dados para análise
+    const response = await axios.get(`${API_URL}/health`);
     res.json({
-      success: true,
-      endpoint,
-      params,
-      data: response.data,
-      structure: {
-        keys: Object.keys(response.data || {}),
-        dataType: typeof response.data,
-        hasData: response.data?.data ? true : false,
-        dataKeys: response.data?.data ? Object.keys(response.data.data) : [],
-        sampleData: response.data?.data?.rows ? response.data.data.rows.slice(0, 2) : null
-      }
+      status: 'success',
+      message: 'Conexão com a API estabelecida com sucesso',
+      data: response.data
     });
-    
   } catch (error) {
-    console.error(`Erro ao explorar API (${endpoint}):`, error.message);
-    
-    res.status(error.response?.status || 500).json({
-      success: false,
-      error: error.message,
-      response: error.response?.data || null,
-      endpoint,
-      params
+    console.error('[ERROR] Falha no diagnóstico:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Falha ao conectar com a API',
+      error: error.message
     });
   }
 });
 
-// Endpoint para buscar dados do Gran Cursos
-app.post('/fetch-gran-data', async (req, res) => {
-  const { token } = req.body;
-  const useRealAPI = req.body.useRealAPI !== false; // Por padrão, usamos a API real exceto se especificado o contrário
-
-  // Verificar se o token está presente
-  if (!token) {
-    return res.status(401).json({
-      error: 'Token não fornecido'
-    });
+// Função auxiliar para logar erros da API
+function logApiError(error, context) {
+  console.error(`[ERROR] ${context}:`, error.message);
+  if (error.response) {
+    console.error('Status:', error.response.status);
+    console.error('Data:', error.response.data);
   }
-
-  // Se for um token de teste, retornar dados simulados
-  if (validTokens.includes(token)) {
-    console.log('Usando dados simulados para token de teste');
-    
-    // Verifica se o cliente quer dados brutos (para teste) ou processados (formato frontend)
-    const rawMockData = req.body.rawFormat === true;
-    
-    // Simular latência da rede (300-1500ms)
-    setTimeout(() => {
-      if (rawMockData) {
-        // Retorna dados no formato bruto da API do Gran Cursos (para testes)
-        const page = req.body.page || 1;
-        const perPage = req.body.perPage || 100;
-        const mockResponse = generateRawMockResponse(page, perPage);
-        res.json(mockResponse);
-      } else {
-        // Retorna dados no formato processado para o frontend
-        const data = generateMockData();
-        res.json(data);
-      }
-    }, Math.floor(Math.random() * 1200) + 300);
-    
-    return;
-  }
-
-  try {
-    console.log('Conectando-se à API do Gran Cursos...');
-    
-    // Função para buscar uma página de dados
-    async function fetchPage(pageNum) {
-      console.log(`Buscando página ${pageNum}...`);
-      return axios.get(`${GRAN_API_URL}?page=${pageNum}&perPage=${DEFAULT_PER_PAGE}&sort=desc`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 15000 // 15 segundos de timeout
-      });
-    }
-
-    // Buscar a primeira página para obter o total de registros
-    const firstPageResponse = await fetchPage(1);
-    
-    // Verificar e processar a resposta da API do Gran Cursos
-    if (!firstPageResponse.data) {
-      throw new Error('Resposta vazia da API do Gran Cursos');
-    }
-    
-    console.log('Estrutura da resposta:', JSON.stringify(Object.keys(firstPageResponse.data)));
-    
-    // Verificar se é o formato esperado da API do Gran Cursos
-    if (firstPageResponse.data.data && firstPageResponse.data.data.rows) {
-      console.log('Formato Gran Cursos detectado');
-      
-      // Extrair registros da primeira página
-      let allRecords = [...firstPageResponse.data.data.rows];
-      const totalRecords = firstPageResponse.data.data.total || allRecords.length;
-      const totalPages = firstPageResponse.data.data.pages || Math.ceil(totalRecords / DEFAULT_PER_PAGE);
-      
-      console.log(`Total de ${totalRecords} registros em ${totalPages} páginas`);
-      
-      // Se houver mais páginas, buscar as demais (limitamos a 10 páginas para evitar sobrecarga)
-      const maxPages = Math.min(totalPages, 10);
-      
-      if (maxPages > 1) {
-        const pagePromises = [];
-        
-        // Criar promises para buscar as páginas adicionais (começando da página 2)
-        for (let page = 2; page <= maxPages; page++) {
-          pagePromises.push(fetchPage(page));
-        }
-        
-        // Executar todas as requisições em paralelo
-        const pageResponses = await Promise.all(pagePromises);
-        
-        // Adicionar os registros de cada página ao array de todos os registros
-        pageResponses.forEach(response => {
-          if (response.data && response.data.data && response.data.data.rows) {
-            allRecords = [...allRecords, ...response.data.data.rows];
-          }
-        });
-      }
-      
-      console.log(`Total de ${allRecords.length} registros recuperados`);
-      
-      // Processar os registros para o formato esperado pelo frontend
-      const studyRecords = allRecords.map(record => {
-        // Converter o tempo de estudo (segundos) para o formato HH:MM esperado pelo frontend
-        const tempoEstudo = record.tempoGasto || 0;
-        const hours = Math.floor(tempoEstudo / 3600);
-        const minutes = Math.floor((tempoEstudo % 3600) / 60);
-        const formattedTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-        
-        // Extrair somente a data do timestamp completo
-        const dataEstudo = record.dataEstudo || new Date().toISOString();
-        
-        // Mapear os campos da API para o formato esperado pelo frontend
-        return {
-          id: record.id || `gc-${Date.now()}`,
-          date: dataEstudo,
-          subject: record.disciplinaTexto || 'Desconhecido',
-          studyTime: formattedTime, // Formato HH:MM que o frontend espera
-          totalExercises: record.totalQuestao || 0,
-          correctAnswers: record.totalAcerto || 0,
-          studyType: record.tipoEstudo || 'Desconhecido',
-          studyPeriod: record.periodoTexto || 'Desconhecido',
-          cycle: record.cicloTexto || '',
-          cycleId: record.cicloId || 0,
-          version: record.versao || 1  // Adicionando o campo versao do Gran Cursos
-        };
-      });
-      
-      // Enviar os dados processados
-      res.json({
-        studyRecords,
-        totalCount: studyRecords.length,
-        source: "Gran Cursos API",
-        rawTotal: totalRecords
-      });
-      return;
-    }
-    
-    // Se chegou aqui, a resposta não está no formato esperado
-    console.log('Formato de resposta desconhecido:', JSON.stringify(firstPageResponse.data).substring(0, 200) + '...');
-    throw new Error('Formato de resposta desconhecido da API do Gran Cursos');
-    
-  } catch (error) {
-    console.error('Erro ao buscar dados do Gran Cursos:', error.message);
-    
-    // Verificar tipo de erro para retornar mensagem adequada
-    if (error.response) {
-      // Erro com resposta do servidor
-      const status = error.response.status;
-      
-      if (status === 401 || status === 403) {
-        return res.status(status).json({
-          error: 'Token de autenticação inválido ou expirado',
-          details: error.message
-        });
-      }
-      
-      return res.status(status).json({
-        error: `Erro na API do Gran Cursos: ${status}`,
-        details: error.message
-      });
-    } else if (error.code === 'ECONNABORTED') {
-      // Timeout na requisição
-      return res.status(504).json({
-        error: 'Timeout ao conectar com a API do Gran Cursos',
-        details: 'A requisição excedeu o tempo limite'
-      });
-    } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-      // Erro de conexão
-      return res.status(502).json({
-        error: 'Não foi possível conectar à API do Gran Cursos',
-        details: error.message
-      });
-    }
-    
-    // Fallback para dados simulados em caso de erro
-    console.log('Usando dados simulados como fallback devido a erro na API');
-    const data = generateMockData();
-    
-    // Adicionar informação sobre o fallback
-    data.isSimulatedFallback = true;
-    data.errorDetails = error.message;
-    
-    res.json(data);
-  }
-});
-
-// Rota padrão para servir o React em produção
-if (process.env.NODE_ENV === 'production') {
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'build', 'index.html'));
-  });
 }
+
+// Rota catch-all para servir o frontend
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
 
 // Endpoint para simular a API do Gran Cursos (para desenvolvimento e testes)
 app.get('/mock-gran-api', (req, res) => {
@@ -406,8 +161,8 @@ app.get('/mock-gran-api', (req, res) => {
 // Endpoint de status e diagnóstico do servidor
 app.get('/status', async (req, res) => {
   try {
-    // Tentar conectar à API do Gran Cursos para verificar disponibilidade
-    const apiStatus = await axios.get(`${GRAN_API_URL}?page=1&perPage=1`, {
+    // Tentar conectar à API para verificar disponibilidade
+    const apiStatus = await axios.get(`${API_URL}/health`, {
       timeout: 3000,
       validateStatus: () => true // Não lançar exceções para códigos de status HTTP
     }).then(response => ({
@@ -424,8 +179,7 @@ app.get('/status', async (req, res) => {
       apiVersion: API_VERSION,
       startTime: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
-      granApiUrl: GRAN_API_URL,
-      defaultPerPage: DEFAULT_PER_PAGE,
+      apiUrl: API_URL,
       endpoints: [
         { path: '/status', method: 'GET', description: 'Verifica status do servidor' },
         { path: '/verify-token', method: 'POST', description: 'Verifica se um token JWT é válido' },
@@ -437,7 +191,7 @@ app.get('/status', async (req, res) => {
     res.json({
       status: 'ok',
       server: serverInfo,
-      granApi: apiStatus,
+      api: apiStatus,
       testTokens: validTokens.map(token => ({token, type: 'test'})),
       endpoints: [
         { path: '/status', method: 'GET', description: 'Verifica status do servidor' },
@@ -514,7 +268,7 @@ app.listen(PORT, () => {
 │ - test-token-1234                         │
 ├───────────────────────────────────────────┤
 │ Ambiente: ${process.env.NODE_ENV || 'development'}                   │
-│ Gran API: ${GRAN_API_URL.substring(0, 35)}... │
+│ API: ${API_URL.substring(0, 35)}... │
 └───────────────────────────────────────────┘
   `);
 });

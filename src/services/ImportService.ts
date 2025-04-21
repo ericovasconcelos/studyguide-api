@@ -103,12 +103,7 @@ export class ImportService {
       const sameQuestions = existing.questions === record.questions;
       const sameCorrectAnswers = existing.correctAnswers === record.correctAnswers;
 
-      // Considera duplicado apenas se TODOS os campos principais forem iguais
-      return sameDate && 
-             sameSubject && 
-             sameTimeSpent && 
-             sameQuestions && 
-             sameCorrectAnswers;
+      return sameDate && sameSubject && sameTimeSpent && sameQuestions && sameCorrectAnswers;
     });
   }
 
@@ -120,69 +115,29 @@ export class ImportService {
       details: []
     };
 
-    if (!Array.isArray(granRecords)) {
-      result.errors++;
-      result.details.push('Dados inválidos recebidos do Gran');
-      console.error('Dados recebidos não são um array:', granRecords);
-      return result;
-    }
-
-    // Log para debug
-    console.log('Registros recebidos do Gran:', JSON.stringify(granRecords, null, 2));
-
     for (const granRecord of granRecords) {
       try {
-        // Log para debug do registro atual
-        console.log('Processando registro:', JSON.stringify(granRecord, null, 2));
-
-        // Validação mais detalhada
-        if (!granRecord) {
-          result.errors++;
-          result.details.push('Registro inválido: registro vazio');
-          continue;
-        }
-
-        // Validar campos obrigatórios
-        if (!granRecord.subject || !granRecord.date) {
-          console.warn('Registro com campos obrigatórios faltando:', {
-            temDisciplina: !!granRecord.subject,
-            temData: !!granRecord.date,
-            registro: granRecord
-          });
-          result.errors++;
-          result.details.push(`Registro inválido: campos obrigatórios faltando - Disciplina: ${granRecord.subject || 'ausente'}, Data: ${granRecord.date || 'ausente'}`);
-          continue;
-        }
-
+        // Converter o registro do Gran para o formato da aplicação
         const study = this.convertGranRecord(granRecord);
-        
-        // Verificar duplicatas
+
+        // Verificar se já existe um registro igual
         const isDuplicate = await this.checkDuplicate(study);
         if (isDuplicate) {
           result.duplicates++;
-          result.details.push(`Registro duplicado: ${study.subject} em ${new Date(study.date).toLocaleDateString()}`);
+          result.details.push(`Registro duplicado ignorado: ${study.id} - ${study.date} - ${study.subject}`);
           continue;
         }
 
         // Salvar o registro
         await this.studyRepository.saveStudy(study);
         result.imported++;
-        result.details.push(`Importado com sucesso: ${study.subject} em ${new Date(study.date).toLocaleDateString()}`);
-
+        result.details.push(`Registro importado: ${study.id} - ${study.date} - ${study.subject}`);
       } catch (error) {
         result.errors++;
-        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-        const disciplina = granRecord?.subject || 'Registro desconhecido';
-        result.details.push(`Erro ao importar ${disciplina}: ${errorMessage}`);
-        console.error('Erro ao processar registro:', {
-          error,
-          granRecord: JSON.stringify(granRecord, null, 2)
-        });
+        result.details.push(`Erro ao importar registro: ${error.message}`);
+        console.error('[DEBUG] Erro ao importar registro:', error);
       }
     }
-
-    // Log do resultado final
-    console.log('Resultado da importação:', result);
 
     return result;
   }

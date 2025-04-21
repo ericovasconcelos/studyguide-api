@@ -1,153 +1,280 @@
+import { Result } from '../../domain/result';
+import { Study } from '../../domain/entities/Study';
 import { StorageAdapter } from './StorageAdapter';
-import { Study } from '../models/Study';
+import { logger } from '../../utils/logger';
+import axios from 'axios';
 import { StudyCycle } from '../models/StudyCycle';
 import { config, getApiUrl } from '../../config/env';
 import { IndexedDBAdapter } from './IndexedDBAdapter';
 
-export class ServerSyncAdapter {
-  private adapter: StorageAdapter;
-  private userId: string;
-  private lastSyncTimestamp: Date = new Date();
-  private maxRetries: number = 3;
-  private retryDelay: number = 1000;
+interface SyncData {
+  studies: Study[];
+  cycles: StudyCycle[];
+  timestamp: Date;
+}
 
-  constructor(adapter: StorageAdapter, userId: string) {
-    this.adapter = adapter;
+export class ServerSyncAdapter implements StorageAdapter {
+  private readonly API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+  private readonly userId: string;
+
+  constructor(userId: string) {
     this.userId = userId;
   }
 
-  /**
-   * Retorna o timestamp da última sincronização bem-sucedida
-   */
-  getLastSyncTimestamp(): Date | null {
-    return this.lastSyncTimestamp;
-  }
-
-  private getApiBaseUrl(): string {
-    // Obter a URL base do ambiente ou usar um fallback
+  async getStudies(): Promise<Result<Study[]>> {
     try {
-      return getApiUrl('base') || 'http://localhost:5000';
-    } catch (error) {
-      console.error('[DEBUG] Erro ao obter URL da API:', error);
-      return 'http://localhost:5000';
-    }
-  }
-
-  /**
-   * Obtém a URL completa para o endpoint de sincronização
-   */
-  private getSyncUrl(endpoint: string, params?: Record<string, string>): string {
-    const baseUrl = this.getApiBaseUrl();
-    let url = `${baseUrl}/sync/${endpoint}`;
-    
-    if (params) {
-      const queryParams = new URLSearchParams();
-      Object.entries(params).forEach(([key, value]) => {
-        queryParams.append(key, value);
-      });
-      url += `?${queryParams.toString()}`;
-    }
-    
-    console.log(`[DEBUG] URL de sincronização gerada: ${url}`);
-    return url;
-  }
-
-  private async fetchWithRetry(url: string, options: RequestInit, retryCount = 0): Promise<Response> {
-    const finalOptions = {
-      ...options,
-      // Adicionar mode: 'no-cors' para evitar erros de CORS
-      mode: 'no-cors' as RequestMode,
-      // Garantir que credentials esteja definido
-      credentials: 'include' as RequestCredentials
-    };
-    
-    try {
-      console.log(`[DEBUG] Tentando fetch para ${url}, tentativa ${retryCount + 1} com modo: ${finalOptions.mode}`);
-      const response = await fetch(url, finalOptions);
-      
-      // Com modo 'no-cors', não podemos verificar o status da resposta
-      // pois a resposta é do tipo 'opaque'
-      return response;
-    } catch (error) {
-      console.error(`[DEBUG] Erro na tentativa ${retryCount + 1}:`, error);
-      
-      if (retryCount < this.maxRetries) {
-        const delay = this.retryDelay * Math.pow(2, retryCount);
-        console.log(`[DEBUG] Aguardando ${delay}ms antes da próxima tentativa...`);
-        
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return this.fetchWithRetry(url, options, retryCount + 1);
+      const response = await fetch(`${this.API_URL}/studies?userId=${this.userId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch studies');
       }
-      
+
+      const data = await response.json();
+      const studies = data.map((study: any) => Study.fromEntity(study));
+      return Result.ok(studies);
+    } catch (error) {
+      logger.error('Failed to get studies from server', { error });
+      return Result.fail('Failed to get studies from server');
+    }
+  }
+
+  async saveStudy(study: Study): Promise<Result<void>> {
+    try {
+      const response = await fetch(`${this.API_URL}/studies`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(study.toEntity()),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save study');
+      }
+
+      return Result.ok(undefined);
+    } catch (error) {
+      logger.error('Failed to save study to server', { error });
+      return Result.fail('Failed to save study to server');
+    }
+  }
+
+  async updateStudy(study: Study): Promise<Result<void>> {
+    try {
+      const response = await fetch(`${this.API_URL}/studies/${study.getId()}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(study.toEntity()),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update study');
+      }
+
+      return Result.ok(undefined);
+    } catch (error) {
+      logger.error('Failed to update study on server', { error });
+      return Result.fail('Failed to update study on server');
+    }
+  }
+
+  async deleteStudy(id: string): Promise<Result<void>> {
+    try {
+      const response = await fetch(`${this.API_URL}/studies/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete study');
+      }
+
+      return Result.ok(undefined);
+    } catch (error) {
+      logger.error('Failed to delete study from server', { error });
+      return Result.fail('Failed to delete study from server');
+    }
+  }
+
+  async sync(): Promise<Result<void>> {
+    try {
+      const response = await fetch(`${this.API_URL}/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: this.userId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to sync');
+      }
+
+      return Result.ok(undefined);
+    } catch (error) {
+      logger.error('Failed to sync with server', { error });
+      return Result.fail('Failed to sync with server');
+    }
+  }
+
+  async downloadChanges(): Promise<Result<SyncData>> {
+    try {
+      const response = await axios.get<SyncData>(`${this.API_URL}/sync`);
+      return Result.ok(response.data);
+    } catch (error) {
+      logger.error('Error downloading changes', { error });
+      return Result.fail('Failed to download changes');
+    }
+  }
+
+  async uploadChanges(studies: Study[]): Promise<Result<void>> {
+    try {
+      await axios.post(`${this.API_URL}/sync`, { studies, timestamp: new Date() });
+      return Result.ok(undefined);
+    } catch (error) {
+      logger.error('Error uploading changes', { error });
+      return Result.fail('Failed to upload changes');
+    }
+  }
+
+  async saveStudies(studies: Study[]): Promise<void> {
+    try {
+      const url = `${this.API_URL}/studies/bulk`;
+      logger.debug('Enviando estudos para o servidor', {
+        url,
+        count: studies.length,
+        firstStudy: studies[0],
+        lastStudy: studies[studies.length - 1]
+      });
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(studies)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      logger.info('Estudos salvos no servidor com sucesso', { count: studies.length });
+    } catch (error) {
+      logger.error('Erro ao salvar estudos no servidor', error);
       throw error;
     }
   }
 
-  async uploadChanges(data: { studies: Study[]; cycles: StudyCycle[] }): Promise<{ timestamp: Date }> {
+  async findDuplicateStudies(studies: Study[]): Promise<Study[]> {
     try {
-      const url = this.getSyncUrl('upload');
-      console.log('[DEBUG] Iniciando uploadChanges para:', url);
+      const existingStudies = await this.getStudies();
+      if (existingStudies.isFailure()) {
+        return [];
+      }
       
-      await this.fetchWithRetry(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': this.userId
-        },
-        body: JSON.stringify(data)
-      });
-
-      // Com mode: 'no-cors', não podemos ler a resposta JSON
-      // Então usamos um timestamp local
-      const timestamp = new Date();
-      this.lastSyncTimestamp = timestamp;
-      return { timestamp };
+      return studies.filter(study => 
+        existingStudies.getValue().some(existing => 
+          existing.getDate().getTime() === study.getDate().getTime() && 
+          existing.getSubject() === study.getSubject()
+        )
+      );
     } catch (error) {
-      console.error('[DEBUG] Erro fatal em uploadChanges:', error);
-      // Criamos um timestamp local para continuar funcionando mesmo offline
-      const localTimestamp = new Date();
-      this.lastSyncTimestamp = localTimestamp;
-      
-      // Retornamos um resultado simulado em vez de propagar o erro
-      return { timestamp: localTimestamp };
+      logger.error('Error finding duplicate studies', { error });
+      return [];
     }
   }
 
-  async downloadChanges(since: Date): Promise<{ studies: Study[]; cycles: StudyCycle[]; timestamp: Date }> {
-    console.log('[DEBUG] Iniciando downloadChanges com data:', since.toISOString());
-    
+  async clear(): Promise<void> {
+    await this.clearUserData();
+  }
+
+  async clearStudies(): Promise<void> {
+    await this.clearUserData();
+  }
+
+  async getCacheStatus(): Promise<{ size: number; lastUpdated: Date }> {
+    const studies = await this.getStudies();
+    return {
+      size: studies.getValue()?.length || 0,
+      lastUpdated: studies.getValue() ? new Date() : new Date(0)
+    };
+  }
+
+  async bulkUpsertStudies(studies: Study[]): Promise<void> {
+    await this.saveStudies(studies);
+  }
+
+  async clearUserData(): Promise<void> {
     try {
-      const url = this.getSyncUrl('download', { since: since.toISOString() });
-      console.log(`[DEBUG] Fazendo fetch para: ${url}`);
-      
-      await this.fetchWithRetry(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-User-Id': this.userId
-        }
+      const url = `${this.API_URL}/studies`;
+      const response = await fetch(url, {
+        method: 'DELETE',
       });
-      
-      // Com mode: 'no-cors', não podemos ler a resposta
-      // Vamos buscar dados locais em vez disso
-      console.log('[DEBUG] Usando dados locais em vez da resposta opaque');
-      const studies = await this.adapter.getStudies();
-      const cycles = await this.adapter.getStudyCycles();
-      const timestamp = new Date();
-      
-      return {
-        studies,
-        cycles,
-        timestamp
-      };
+
+      if (!response.ok) {
+        throw new Error(`Failed to clear user data: ${response.statusText}`);
+      }
+
+      logger.info('Successfully cleared user data');
     } catch (error) {
-      console.error('[DEBUG] Erro em downloadChanges:', error);
-      // Em caso de erro, retornar dados vazios
-      return {
-        studies: [],
-        cycles: [],
-        timestamp: new Date()
-      };
+      logger.error('Error clearing user data', error);
+      throw error;
+    }
+  }
+
+  async clearSystemData(): Promise<void> {
+    try {
+      const url = `${this.API_URL}/system`;
+      const response = await fetch(url, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to clear system data: ${response.statusText}`);
+      }
+
+      logger.info('Successfully cleared system data');
+    } catch (error) {
+      logger.error('Error clearing system data', error);
+      throw error;
+    }
+  }
+
+  async getStudyCycles(): Promise<StudyCycle[]> {
+    try {
+      const response = await axios.get<StudyCycle[]>(`${this.API_URL}/cycles`);
+      return response.data;
+    } catch (error) {
+      logger.error('Error getting study cycles', { error });
+      return [];
+    }
+  }
+
+  async saveStudyCycle(cycle: StudyCycle): Promise<void> {
+    try {
+      await axios.post(`${this.API_URL}/cycles`, cycle);
+    } catch (error) {
+      logger.error('Error saving study cycle', { error });
+      throw error;
+    }
+  }
+
+  async saveStudyCycles(cycles: StudyCycle[]): Promise<void> {
+    try {
+      await axios.post(`${this.API_URL}/cycles/bulk`, cycles);
+    } catch (error) {
+      logger.error('Error saving study cycles', { error });
+      throw error;
+    }
+  }
+
+  async clearStudyCycles(): Promise<void> {
+    try {
+      await axios.delete(`${this.API_URL}/cycles`);
+    } catch (error) {
+      logger.error('Error clearing study cycles', { error });
+      throw error;
     }
   }
 } 

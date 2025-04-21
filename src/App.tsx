@@ -1,14 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { Button, Modal, Input, Drawer, Form, notification, Menu, Avatar, Badge } from "antd";
-import StudyForm from "./components/StudyForm";
-import StudyCycleManager from "./components/StudyCycleManager";
-import { NewStudyDashboard } from "./components/Dashboard/NewStudyDashboard";
-import SettingsManager from "./components/SettingsManager";
-import GranImport from "./components/GranImport";
-import { ConfigProvider, Typography } from 'antd';
+import { toDashboardStudy } from "./utils/mapper";
+import { Button, Modal, Menu, Avatar, Badge, ConfigProvider, Typography, notification } from "antd";
 import {
-  CloudUploadOutlined,
-  CloudDownloadOutlined,
   DashboardOutlined,
   BookOutlined,
   BarChartOutlined,
@@ -16,117 +9,68 @@ import {
   BellOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  UserOutlined,
-  ImportOutlined
+  UserOutlined
 } from "@ant-design/icons";
+
+import StudyForm from "./components/StudyForm";
+import StudyCycleManager from "./components/StudyCycleManager";
+import { NewStudyDashboard } from "./components/Dashboard/NewStudyDashboard";
+import SettingsManager from "./components/SettingsManager";
+import { useDataContext, DataProvider } from './contexts/DataContext';
+import { Study } from './domain/entities/Study';
+
 import "./App.css";
-import { studyService, studyCycleService } from './data/config/dependencies';
-import { useStudies } from './hooks/useStudies';
-import { useStudyCycles } from './hooks/useStudyCycles';
-import { Study } from './data/models/Study';
 
 const { Text } = Typography;
 
-export default function StudyTracker() {
-  // Hooks personalizados para gerenciar estudos e ciclos
-  const { 
-    studies, 
-    loading: studiesLoading, 
-    error: studiesError, 
-    addStudy,
-    refresh: refreshStudies
-  } = useStudies(studyService);
-
+function AppContent() {
   const {
-    cycles: studyCycle,
-    loading: cyclesLoading,
-    error: cyclesError,
-    updateCycles: setStudyCycle,
-    reloadCycles: refreshCycles
-  } = useStudyCycles(studyCycleService);
+    studies,
+    loading: studiesLoading,
+    error: studiesError,
+    saveStudy,
+    refresh: refreshStudies,
+    sync
+  } = useDataContext();
 
-  // Estados locais da UI
+  // Estados da UI
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isCycleModalVisible, setIsCycleModalVisible] = useState(false);
-  const [isCloudDrawerVisible, setIsCloudDrawerVisible] = useState(false);
-  const [cloudUserId, setCloudUserId] = useState("");
-  const [cloudKey, setCloudKey] = useState("");
-  const [cloudSyncStatus, setCloudSyncStatus] = useState(false);
+  const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
+  const [studyCycle, setStudyCycle] = useState(null);
 
-  // Novo estado para modal de configurações
-  const [isSettingsModalVisible, setIsSettingsModalVisible] = useState(false);
+  // Efeito para carregar dados iniciais
+  useEffect(() => {
+    refreshStudies();
+  }, [refreshStudies]);
 
-  // Novo estado para modal de importação
-  const [isImportModalVisible, setIsImportModalVisible] = useState(false);
+  // Efeito para sincronização periódica
+  useEffect(() => {
+    const interval = setInterval(() => {
+      sync();
+    }, 300000); // 5 minutos
+
+    return () => clearInterval(interval);
+  }, [sync]);
 
   const handleSaveStudy = async (newRecord: Study) => {
-    const result = await addStudy(newRecord);
-    if (result.success) {
+    try {
+      await saveStudy(newRecord);
       setIsModalVisible(false);
       notification.success({
-        message: "Estudo registrado",
-        description: "Seu registro de estudo foi salvo com sucesso!",
-        placement: "topRight"
+        message: 'Estudo registrado',
+        description: 'Seu registro de estudo foi salvo com sucesso!',
+        placement: 'topRight'
       });
-    } else {
+    } catch (error) {
       notification.error({
-        message: "Erro ao salvar",
-        description: result.error,
-        placement: "topRight"
+        message: 'Erro ao salvar',
+        description: 'Ocorreu um erro ao salvar o estudo',
+        placement: 'topRight'
       });
     }
-  };
-
-  const handleConnectToCloud = () => {
-    if (!cloudUserId || !cloudKey) {
-      notification.error({
-        message: "Campos obrigatórios",
-        description: "Por favor, preencha o ID do usuário e a chave de sincronização",
-        placement: "topRight"
-      });
-      return;
-    }
-    
-    setCloudSyncStatus(true);
-    setIsCloudDrawerVisible(false);
-    
-    notification.success({
-      message: "Conectado!",
-      description: "Seus dados agora estão sincronizados com a nuvem",
-      placement: "topRight"
-    });
-  };
-  
-  const handleDisconnectFromCloud = () => {
-    setCloudSyncStatus(false);
-    
-    notification.info({
-      message: "Desconectado",
-      description: "Seus dados agora são apenas locais",
-      placement: "topRight"
-    });
-  };
-
-  const handleImportClick = () => {
-    const token = localStorage.getItem('granToken');
-    if (!token) {
-      notification.warning({
-        message: 'Token não configurado',
-        description: 'Configure o token do Gran nas configurações antes de importar.',
-        btn: (
-          <Button type="primary" size="small" onClick={() => {
-            setIsImportModalVisible(false);
-            setIsSettingsModalVisible(true);
-          }}>
-            Ir para Configurações
-          </Button>
-        )
-      });
-      return;
-    }
-    setIsImportModalVisible(true);
   };
 
   const renderHeader = () => (
@@ -150,11 +94,6 @@ export default function StudyTracker() {
         <Badge count={5}>
           <Button type="text" icon={<BellOutlined />} />
         </Badge>
-        <Button
-          type="text"
-          icon={cloudSyncStatus ? <CloudDownloadOutlined /> : <CloudUploadOutlined />}
-          onClick={() => cloudSyncStatus ? handleDisconnectFromCloud() : setIsCloudDrawerVisible(true)}
-        />
         <Avatar icon={<UserOutlined />} />
       </div>
     </div>
@@ -186,12 +125,6 @@ export default function StudyTracker() {
           },
           {
             key: '4',
-            icon: <ImportOutlined />,
-            label: 'Importar do Gran',
-            onClick: handleImportClick,
-          },
-          {
-            key: '5',
             icon: <SettingOutlined />,
             label: 'Configurações',
             onClick: () => setIsSettingsModalVisible(true),
@@ -201,10 +134,7 @@ export default function StudyTracker() {
     </div>
   );
 
-  // Adicionar classe ao main-content baseado no estado do sidebar
-  const mainContentClass = `main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''} fade-in`;
-
-  if (studiesLoading || cyclesLoading) {
+  if (studiesLoading) {
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
@@ -213,58 +143,20 @@ export default function StudyTracker() {
     );
   }
 
-  if (studiesError || cyclesError) {
-    const error = studiesError || cyclesError;
-    console.error('[DEBUG] Erro detalhado na aplicação:', error);
-    
+  if (studiesError) {
     return (
       <div className="error-container">
         <h2>Erro ao carregar dados</h2>
         <p className="error-message">
-          {error?.message || 'Erro desconhecido'}
+          {studiesError}
         </p>
-        
-        {/* Mostrar detalhes do erro para debug */}
-        <div className="error-details" style={{ marginBottom: '20px', padding: '10px', background: '#f8f8f8', border: '1px solid #ddd', borderRadius: '4px', maxHeight: '200px', overflow: 'auto' }}>
-          <h3>Detalhes do erro (para diagnóstico):</h3>
-          <pre>{JSON.stringify(error, null, 2)}</pre>
-        </div>
-        
         <div className="error-actions">
           <Button type="primary" onClick={() => window.location.reload()}>
             Tentar Novamente
           </Button>
-          <Button onClick={() => {
-            // Limpa os estados de erro e recarrega apenas os dados locais
-            if (studiesError) refreshStudies();
-            if (cyclesError) refreshCycles();
-          }}>
+          <Button onClick={refreshStudies}>
             Carregar Dados Locais
           </Button>
-          <Button 
-            onClick={async () => {
-              try {
-                const response = await fetch('http://localhost:5000/sync/download?since=2023-01-01T00:00:00.000Z', {
-                  headers: { 'X-User-Id': 'user-123' }
-                });
-                const result = await response.text();
-                alert(`Teste de conexão: ${response.status} ${response.statusText}\n\nResposta: ${result.substring(0, 200)}${result.length > 200 ? '...' : ''}`);
-              } catch (err) {
-                alert(`Teste de conexão falhou: ${err instanceof Error ? err.message : String(err)}`);
-              }
-            }}
-          >
-            Testar Conexão API
-          </Button>
-        </div>
-        <div className="error-help">
-          <h3>Sugestões para resolver:</h3>
-          <ul>
-            <li>Verifique sua conexão com a internet</li>
-            <li>Certifique-se de que o servidor está rodando (npm run server)</li>
-            <li>No WSL, talvez seja necessário usar o endereço IP em vez de localhost</li>
-            <li>Verifique o console do navegador para mais detalhes sobre o erro</li>
-          </ul>
         </div>
       </div>
     );
@@ -283,10 +175,9 @@ export default function StudyTracker() {
         {renderHeader()}
         {renderSidebar()}
         
-        <main className={mainContentClass}>
+        <main className={`main-content ${sidebarCollapsed ? 'sidebar-collapsed' : ''} fade-in`}>
           <NewStudyDashboard 
-            studyRecords={studies}
-            studyCycle={studyCycle?.[0]}
+            studyRecords={studies.map(toDashboardStudy)}
             setIsModalVisible={setIsModalVisible}
             setIsCycleModalVisible={setIsCycleModalVisible}
           />
@@ -294,7 +185,7 @@ export default function StudyTracker() {
 
         <Modal
           title="Adicionar Registro de Estudo"
-          visible={isModalVisible}
+          open={isModalVisible}
           onCancel={() => setIsModalVisible(false)}
           footer={null}
         >
@@ -304,16 +195,13 @@ export default function StudyTracker() {
         </Modal>
 
         <Modal
-          title="Gerenciar Ciclos"
+          title="Gerenciar Ciclos de Estudo"
           open={isCycleModalVisible}
           onCancel={() => setIsCycleModalVisible(false)}
           footer={null}
           width={800}
         >
-          <StudyCycleManager
-            studyCycle={studyCycle}
-            setStudyCycle={setStudyCycle}
-          />
+          <StudyCycleManager studyCycle={studyCycle} setStudyCycle={setStudyCycle} />
         </Modal>
 
         <Modal
@@ -323,66 +211,17 @@ export default function StudyTracker() {
           footer={null}
           width={800}
         >
-          <SettingsManager
-            cloudUserId={cloudUserId}
-            cloudKey={cloudKey}
-            onCloudConnect={handleConnectToCloud}
-            onCloudDisconnect={handleDisconnectFromCloud}
-            cloudSyncStatus={cloudSyncStatus}
-          />
+          <SettingsManager />
         </Modal>
-
-        <Modal
-          title="Importar do Gran Cursos"
-          open={isImportModalVisible}
-          onCancel={() => setIsImportModalVisible(false)}
-          footer={null}
-          width={800}
-        >
-          <GranImport />
-        </Modal>
-
-        <Drawer
-          title="Sincronização com a Nuvem"
-          placement="right"
-          onClose={() => setIsCloudDrawerVisible(false)}
-          open={isCloudDrawerVisible}
-        >
-          <div style={{ marginBottom: "20px" }}>
-            <p>Configure a sincronização para acessar seus dados de estudo em qualquer dispositivo.</p>
-            <p>Crie um ID único e uma chave secreta que você usará em todos os dispositivos para acessar seus dados.</p>
-          </div>
-          
-          <Form layout="vertical">
-            <Form.Item label="ID de Usuário (crie um ID único)">
-              <Input 
-                value={cloudUserId} 
-                onChange={(e) => setCloudUserId(e.target.value)}
-                placeholder="Ex: eric123"
-              />
-            </Form.Item>
-            
-            <Form.Item label="Chave de Sincronização (crie uma senha segura)">
-              <Input.Password 
-                value={cloudKey} 
-                onChange={(e) => setCloudKey(e.target.value)}
-                placeholder="Crie uma senha para sincronização"
-              />
-            </Form.Item>
-            
-            <Button type="primary" block onClick={handleConnectToCloud}>
-              Conectar e Sincronizar
-            </Button>
-          </Form>
-          
-          <div style={{ marginTop: "20px", border: "1px solid #333", padding: "15px", borderRadius: "5px" }}>
-            <h4>Como funciona?</h4>
-            <p>1. Use o mesmo ID e chave em todos os seus dispositivos</p>
-            <p>2. Seus dados serão sincronizados automaticamente</p>
-            <p>3. Se você perder seus dados, basta usar o mesmo ID e chave para recuperá-los</p>
-          </div>
-        </Drawer>
       </div>
     </ConfigProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <DataProvider>
+      <AppContent />
+    </DataProvider>
   );
 }
