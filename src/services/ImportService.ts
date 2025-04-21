@@ -1,5 +1,6 @@
-import { Study } from '../data/models/Study';
+import { Study } from '../domain/entities/Study';
 import { StudyRepository } from '../data/repositories/StudyRepository';
+import { logger } from '../utils/logger';
 
 interface GranStudyRecord {
   id: string | number;
@@ -25,52 +26,28 @@ interface ImportResult {
 export class ImportService {
   constructor(private studyRepository: StudyRepository) {}
 
-  private convertGranRecord(granRecord: GranStudyRecord): Study {
-    // Log para debug
-    console.log('[DEBUG] Convertendo registro:', JSON.stringify(granRecord, null, 2));
-
-    // Validar se o registro existe e tem os campos obrigatórios
-    if (!granRecord || !granRecord.subject || !granRecord.date) {
-      throw new Error(`Registro inválido: campos obrigatórios faltando - 
-        Disciplina: ${granRecord?.subject || 'ausente'}, 
-        Data: ${granRecord?.date || 'ausente'}`);
-    }
-
-    // Converter studyTime de string "HH:mm" para minutos
+  private convertGranRecord(granRecord: GranStudyRecord): any {
     let timeSpentMinutes = 0;
     if (granRecord.studyTime && typeof granRecord.studyTime === 'string') {
       try {
         const [hours, minutes] = granRecord.studyTime.split(':').map(Number);
         if (!isNaN(hours) && !isNaN(minutes)) {
           timeSpentMinutes = (hours * 60) + minutes;
-        } else {
-          console.warn('[DEBUG] Tempo inválido:', granRecord.studyTime);
         }
-      } catch (error) {
-        console.warn('[DEBUG] Erro ao converter tempo:', granRecord.studyTime, error);
-      }
+      } catch { /* ignore */ }
     }
-
-    // Garantir que temos um ID único e válido
-    const id = granRecord.id ? String(granRecord.id) : `gran-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
-
-    // Formatar a data para o formato ISO
-    let date;
+    let dateStr = '';
     try {
       const parsedDate = new Date(granRecord.date);
-      if (isNaN(parsedDate.getTime())) {
-        throw new Error('Data inválida');
+      if (!isNaN(parsedDate.getTime())) {
+         dateStr = parsedDate.toISOString().split('T')[0];
       }
-      date = parsedDate.toISOString().split('T')[0];
-    } catch (error) {
-      console.error('[DEBUG] Erro ao converter data:', granRecord.date);
-      throw new Error(`Data inválida: ${granRecord.date}`);
-    }
+    } catch { /* ignore */ }
+    const id = granRecord.id ? String(granRecord.id) : `gran-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 
-    // Criar o objeto Study com valores validados
-    const study: Study = {
+    return {
       id, 
-      date,
+      date: dateStr,
       subject: granRecord.subject,
       timeSpent: timeSpentMinutes,
       questions: typeof granRecord.totalExercises === 'number' ? granRecord.totalExercises : 0,
@@ -81,29 +58,21 @@ export class ImportService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-
-    // Log do objeto convertido
-    console.log('[DEBUG] Registro convertido:', JSON.stringify(study, null, 2));
-
-    return study;
   }
 
   private async checkDuplicate(record: Study): Promise<boolean> {
-    const existingRecords = await this.studyRepository.getStudies();
+    const existingRecords: Study[] = await this.studyRepository.findAll();
+
     return existingRecords.some((existing: Study) => {
-      // Verifica se é o mesmo registro do Gran (pelo ID)
-      if (existing.id === record.id) {
+      if (existing.getId() === record.getId()) {
         return true;
       }
 
-      // Verifica se é o mesmo estudo comparando todos os campos relevantes
-      const sameDate = existing.date === record.date;
-      const sameSubject = existing.subject === record.subject;
-      const sameTimeSpent = existing.timeSpent === record.timeSpent;
-      const sameQuestions = existing.questions === record.questions;
-      const sameCorrectAnswers = existing.correctAnswers === record.correctAnswers;
+      const sameDate = existing.getDate().toISOString().split('T')[0] === record.getDate().toISOString().split('T')[0];
+      const sameSubject = existing.getSubject() === record.getSubject();
+      const sameTimeSpent = existing.getDuration() === record.getDuration();
 
-      return sameDate && sameSubject && sameTimeSpent && sameQuestions && sameCorrectAnswers;
+      return sameDate && sameSubject && sameTimeSpent;
     });
   }
 
@@ -117,25 +86,47 @@ export class ImportService {
 
     for (const granRecord of granRecords) {
       try {
-        // Converter o registro do Gran para o formato da aplicação
-        const study = this.convertGranRecord(granRecord);
+        let timeSpentMinutes = 0;
+        if (granRecord.studyTime && typeof granRecord.studyTime === 'string') {
+            try { const [h, m] = granRecord.studyTime.split(':').map(Number); if (!isNaN(h) && !isNaN(m)) timeSpentMinutes = h * 60 + m; } catch {} 
+        }
+        let dateObj: Date;
+        try { dateObj = new Date(granRecord.date); if (isNaN(dateObj.getTime())) throw new Error(); } catch { throw new Error(`Invalid date: ${granRecord.date}`); }
 
-        // Verificar se já existe um registro igual
+        const studyProps = {
+            id: granRecord.id ? String(granRecord.id) : `gran-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+            userId: 'default',
+            date: dateObj,
+            subject: granRecord.subject,
+            topic: granRecord.cycle || '',
+            duration: timeSpentMinutes,
+            notes: granRecord.studyPeriod ? `Period: ${granRecord.studyPeriod}` : '',
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+        
+        const studyResult = Study.create(studyProps);
+        if (studyResult.failed()) {
+          throw new Error(`Validation failed: ${studyResult.getError()}`);
+        }
+        const study: Study = studyResult.getValue();
+
         const isDuplicate = await this.checkDuplicate(study);
         if (isDuplicate) {
           result.duplicates++;
-          result.details.push(`Registro duplicado ignorado: ${study.id} - ${study.date} - ${study.subject}`);
+          result.details.push(`Duplicate ignored: ${study.getId()} - ${study.getDate().toISOString().split('T')[0]} - ${study.getSubject()}`);
           continue;
         }
 
-        // Salvar o registro
-        await this.studyRepository.saveStudy(study);
+        await this.studyRepository.save(study);
         result.imported++;
-        result.details.push(`Registro importado: ${study.id} - ${study.date} - ${study.subject}`);
-      } catch (error) {
+        result.details.push(`Imported: ${study.getId()} - ${study.getDate().toISOString().split('T')[0]} - ${study.getSubject()}`);
+
+      } catch (error: unknown) {
         result.errors++;
-        result.details.push(`Erro ao importar registro: ${error.message}`);
-        console.error('[DEBUG] Erro ao importar registro:', error);
+        const msg = error instanceof Error ? error.message : String(error);
+        result.details.push(`Error importing (ID: ${granRecord.id || 'N/A'}): ${msg}`);
+        logger.error(`Error importing (ID: ${granRecord.id || 'N/A'}):`, error);
       }
     }
 

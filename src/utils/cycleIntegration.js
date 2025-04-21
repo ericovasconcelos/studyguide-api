@@ -175,7 +175,7 @@ const detectCycleRounds = async (token, cycleId) => {
 
     // Filtrar registros deste ciclo
     const cycleRecords = response.data.data.rows.filter(record => {
-      const matchesCycle = record.cicloId == cycleId; // Comparação não estrita para permitir string/number
+      const matchesCycle = record.cicloId === cycleId;
       return matchesCycle;
     });
     

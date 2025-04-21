@@ -1,7 +1,5 @@
 import { StorageAdapter } from '../data/adapters/StorageAdapter';
 import { ServerSyncAdapter } from '../data/adapters/ServerSyncAdapter';
-import { Study } from '../data/models/Study';
-import { StudyCycle } from '../data/models/StudyCycle';
 
 export enum CleanupScope {
   LOCAL = 'local',

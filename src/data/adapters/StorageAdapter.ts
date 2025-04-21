@@ -10,4 +10,8 @@ export interface StorageAdapter {
   
   // Sync operations
   sync(): Promise<Result<void>>;
+  invalidateCache(): Promise<Result<void>>;
+  
+  // Cleanup operations
+  clearStudies(): Promise<void>;
 } 

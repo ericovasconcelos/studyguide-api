@@ -3,7 +3,6 @@ import { Study } from '../../domain/entities/Study';
 import { StorageAdapter } from './StorageAdapter';
 import { logger } from '../../utils/logger';
 import { StudyCycle } from '../models/StudyCycle';
-import { StudyService } from '../services/StudyService';
 
 export class LocalStorageAdapter implements StorageAdapter {
   private db: IDBDatabase | null = null;
@@ -44,8 +43,25 @@ export class LocalStorageAdapter implements StorageAdapter {
       const request = store.getAll();
 
       request.onsuccess = () => {
-        const studies = request.result.map((data: any) => Study.fromEntity(data));
-        resolve(Result.ok(studies));
+        const results: Result<Study>[] = request.result.map((data: any) => Study.fromEntity(data));
+
+        const successfulStudies: Study[] = results
+          .filter(result => result.succeeded())
+          .map(result => result.getValue());
+
+        const failedResults = results.filter(result => result.failed());
+        if (failedResults.length > 0) {
+          logger.warn(`Failed to convert ${failedResults.length} item(s) from IndexedDB data to Study entity.`);
+          failedResults.forEach(failure => {
+            try {
+              logger.error('Entity conversion error:', failure.getError());
+            } catch (e) {
+              logger.error('Error getting error message from failed Result', e);
+            }
+          });
+        }
+
+        resolve(Result.ok(successfulStudies));
       };
 
       request.onerror = () => {
@@ -106,9 +122,9 @@ export class LocalStorageAdapter implements StorageAdapter {
     return Result.ok(undefined);
   }
 
-  invalidateCache(): void {
-    // Implementation needed
-    throw new Error('Method not implemented');
+  async invalidateCache(): Promise<Result<void>> {
+    logger.info('invalidateCache called on LocalStorageAdapter (no-op).');
+    return Result.ok(undefined);
   }
 
   async getCacheStatus(): Promise<{ size: number; lastUpdated: Date }> {
@@ -131,28 +147,72 @@ export class LocalStorageAdapter implements StorageAdapter {
     throw new Error('Method not implemented');
   }
 
-  async getStudyCycles(): Promise<StudyCycle[]> {
-    // Implementation needed
-    throw new Error('Method not implemented');
+  async getStudyCycles(): Promise<Result<StudyCycle[]>> {
+    // Implementation needed - returning success with empty array for now
+    logger.warn('LocalStorageAdapter.getStudyCycles is not implemented, returning empty array.');
+    return Result.ok([]); // Wrap result in Result.ok()
   }
 
-  async saveStudyCycle(cycle: StudyCycle): Promise<void> {
+  async saveStudyCycle(cycle: StudyCycle): Promise<Result<void>> {
     // Implementation needed
-    throw new Error('Method not implemented');
+    logger.warn('LocalStorageAdapter.saveStudyCycle is not implemented.');
+    // throw new Error('Method not implemented');
+    return Result.ok(undefined); // Return placeholder success result
   }
 
-  async saveStudyCycles(cycles: StudyCycle[]): Promise<void> {
+  async saveStudyCycles(cycles: StudyCycle[]): Promise<Result<void>> {
     // Implementation needed
-    throw new Error('Method not implemented');
+    logger.warn('LocalStorageAdapter.saveStudyCycles is not implemented.');
+    // throw new Error('Method not implemented');
+    return Result.ok(undefined);
   }
 
-  async clearStudyCycles(): Promise<void> {
+  async clearStudyCycles(): Promise<Result<void>> {
     // Implementation needed
-    throw new Error('Method not implemented');
+    logger.warn('LocalStorageAdapter.clearStudyCycles is not implemented.');
+    // throw new Error('Method not implemented');
+    return Result.ok(undefined);
   }
 
   async saveStudies(studies: Study[]): Promise<void> {
     // Implementation needed
     throw new Error('Method not implemented');
+  }
+
+  async clearStudies(): Promise<void> {
+    if (!this.db) {
+      logger.error('Database not initialized before clearing studies');
+      return Promise.reject('Database not initialized');
+    }
+
+    return new Promise((resolve, reject) => {
+      try {
+        const transaction = this.db!.transaction(this.STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(this.STORE_NAME);
+        const request = store.clear();
+
+        request.onsuccess = () => {
+          logger.info('Studies cleared from IndexedDB');
+          resolve();
+        };
+
+        request.onerror = () => {
+          logger.error('Failed to clear studies from IndexedDB', request.error);
+          reject('Failed to clear studies');
+        };
+
+        transaction.oncomplete = () => {
+          // Optional: Can resolve here as well if preferred
+        };
+
+        transaction.onerror = () => {
+           logger.error('Transaction error while clearing studies', transaction.error);
+           reject('Transaction error while clearing studies');
+        }
+      } catch (error) {
+        logger.error('Error initiating clearStudies transaction', error);
+        reject('Error initiating clearStudies transaction');
+      }
+    });
   }
 } 

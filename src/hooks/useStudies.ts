@@ -1,67 +1,76 @@
 import { useState, useCallback } from 'react';
 import { Study } from '../domain/entities/Study';
-import { useData } from './useData';
+import { useDataContext } from '../contexts/DataContext';
 
 export function useStudies() {
   const [studies, setStudies] = useState<Study[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const { getStudies, saveStudy, updateStudy, deleteStudy } = useData();
+  
+  const { 
+    getStudies: contextGetStudies, 
+    saveStudy: contextSaveStudy, 
+    updateStudy: contextUpdateStudy, 
+    deleteStudy: contextDeleteStudy 
+  } = useDataContext();
 
   const refresh = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getStudies();
+      const data = await contextGetStudies();
       setStudies(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao carregar estudos');
     } finally {
       setLoading(false);
     }
-  }, [getStudies]);
+  }, [contextGetStudies]);
 
   const save = useCallback(async (study: Study) => {
     try {
       setLoading(true);
       setError(null);
-      await saveStudy(study);
+      await contextSaveStudy(study);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao salvar estudo');
+      const errorMsg = err instanceof Error ? err.message : 'Erro ao salvar estudo';
+      setError(errorMsg);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [saveStudy, refresh]);
+  }, [contextSaveStudy, refresh]);
 
   const update = useCallback(async (study: Study) => {
     try {
       setLoading(true);
       setError(null);
-      await updateStudy(study);
+      await contextUpdateStudy(study);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao atualizar estudo');
+      const errorMsg = err instanceof Error ? err.message : 'Erro ao atualizar estudo';
+      setError(errorMsg);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [updateStudy, refresh]);
+  }, [contextUpdateStudy, refresh]);
 
   const remove = useCallback(async (id: string) => {
     try {
       setLoading(true);
       setError(null);
-      await deleteStudy(id);
+      await contextDeleteStudy(id);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao deletar estudo');
+      const errorMsg = err instanceof Error ? err.message : 'Erro ao deletar estudo';
+      setError(errorMsg);
       throw err;
     } finally {
       setLoading(false);
     }
-  }, [deleteStudy, refresh]);
+  }, [contextDeleteStudy, refresh]);
 
   return {
     studies,

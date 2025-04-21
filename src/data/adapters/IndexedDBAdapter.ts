@@ -56,7 +56,7 @@ export class IndexedDBAdapter implements StorageAdapter {
       request.onsuccess = () => {
         const studies = request.result.map((data: any) => {
           const studyResult = Study.fromEntity(data);
-          if (studyResult.isFailure()) {
+          if (!studyResult.isSuccessful()) {
             logger.error('Failed to convert study from entity', studyResult.getError());
             return null;
           }

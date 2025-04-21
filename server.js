@@ -56,9 +56,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// Servir arquivos estáticos em produção
+// Servir arquivos estáticos e rota catch-all APENAS em produção
 if (process.env.NODE_ENV === 'production') {
+  // Servir build estático
   app.use(express.static(path.join(__dirname, 'build')));
+
+  // Rota catch-all para SPA (Single Page Application)
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'build', 'index.html'));
+  });
 }
 
 // Tokens para teste local
@@ -143,11 +149,6 @@ function logApiError(error, context) {
     console.error('Data:', error.response.data);
   }
 }
-
-// Rota catch-all para servir o frontend
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
 
 // Endpoint para simular a API do Gran Cursos (para desenvolvimento e testes)
 app.get('/mock-gran-api', (req, res) => {

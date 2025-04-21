@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Input, InputNumber, Button, Upload, List, Select, Tabs, Card, Badge, Spin, Alert, Tooltip } from "antd";
+import { Input, InputNumber, Button, Upload, List, Select, Tabs, Card, Alert, Tooltip } from "antd";
 import { UploadOutlined, CloudOutlined, FileOutlined, SyncOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import Papa from "papaparse";
 import axios from "axios";
@@ -8,7 +8,6 @@ import { syncStudyCycleWithCloud } from "../utils/storage";
 const { 
   fetchCyclesFromAPI, 
   detectCycleRounds, 
-  mergeCycleWithLocalGoals,
   saveLocalGoals
 } = require("../utils/cycleIntegration");
 
@@ -78,8 +77,8 @@ export default function StudyCycleManager({ studyCycle, setStudyCycle }) {
       
       // Filtrar registros pelo ciclo e rodada selecionados
       const records = response.data.data.rows.filter(record => {
-        const matchesCycle = record.cicloId == cycleId; // Comparação não estrita para permitir string/number
-        const matchesRound = record.versao == roundId; // Comparação não estrita
+        const matchesCycle = record.cicloId === cycleId;
+        const matchesRound = record.versao === roundId;
         return matchesCycle && matchesRound;
       });
       

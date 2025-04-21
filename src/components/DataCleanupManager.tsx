@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Modal, Steps, Form, Checkbox, Button, Alert, Space, Typography } from 'antd';
 import type { CheckboxOptionType } from 'antd/es/checkbox/Group';
 import { 
-  DatabaseOutlined, 
   CloudServerOutlined, 
   SettingOutlined,
   WarningOutlined,

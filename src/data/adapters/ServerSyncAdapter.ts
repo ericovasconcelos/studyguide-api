@@ -4,8 +4,6 @@ import { StorageAdapter } from '../../domain/interfaces/StorageAdapter';
 import { logger } from '../../utils/logger';
 import axios from 'axios';
 import { StudyCycle } from '../models/StudyCycle';
-import { getApiUrl } from '../../config/env';
-import { IndexedDBAdapter } from './IndexedDBAdapter';
 
 interface SyncData {
   studies: Study[];
@@ -169,7 +167,7 @@ export class ServerSyncAdapter implements StorageAdapter {
   async findDuplicateStudies(studies: Study[]): Promise<Study[]> {
     try {
       const existingStudies = await this.getStudies();
-      if (existingStudies.isFailure()) {
+      if (!existingStudies.isSuccessful()) {
         return [];
       }
       
@@ -241,40 +239,43 @@ export class ServerSyncAdapter implements StorageAdapter {
     }
   }
 
-  async getStudyCycles(): Promise<StudyCycle[]> {
+  async getStudyCycles(): Promise<Result<StudyCycle[]>> {
     try {
       const response = await axios.get<StudyCycle[]>(`${this.API_URL}/cycles`);
-      return response.data;
+      return Result.ok(response.data);
     } catch (error) {
       logger.error('Error getting study cycles', { error });
-      return [];
+      return Result.fail('Failed to get study cycles');
     }
   }
 
-  async saveStudyCycle(cycle: StudyCycle): Promise<void> {
+  async saveStudyCycle(cycle: StudyCycle): Promise<Result<void>> {
     try {
       await axios.post(`${this.API_URL}/cycles`, cycle);
+      return Result.ok(undefined);
     } catch (error) {
       logger.error('Error saving study cycle', { error });
-      throw error;
+      return Result.fail('Failed to save study cycle');
     }
   }
 
-  async saveStudyCycles(cycles: StudyCycle[]): Promise<void> {
+  async saveStudyCycles(cycles: StudyCycle[]): Promise<Result<void>> {
     try {
       await axios.post(`${this.API_URL}/cycles/bulk`, cycles);
+      return Result.ok(undefined);
     } catch (error) {
       logger.error('Error saving study cycles', { error });
-      throw error;
+      return Result.fail('Failed to save study cycles');
     }
   }
 
-  async clearStudyCycles(): Promise<void> {
+  async clearStudyCycles(): Promise<Result<void>> {
     try {
       await axios.delete(`${this.API_URL}/cycles`);
+      return Result.ok(undefined);
     } catch (error) {
       logger.error('Error clearing study cycles', { error });
-      throw error;
+      return Result.fail('Failed to clear study cycles');
     }
   }
 

@@ -58,7 +58,7 @@ export class Study {
     }
 
     const durationResult = Duration.create(props.duration);
-    if (durationResult.isFailure()) {
+    if (durationResult.failed()) {
       return Result.fail(durationResult.getError());
     }
 
@@ -161,7 +161,7 @@ export class Study {
       return Result.fail('Duration is required');
     }
     const durationResult = Duration.create(minutes);
-    if (durationResult.isFailure()) {
+    if (durationResult.failed()) {
       return Result.fail(durationResult.getError());
     }
     this.duration = durationResult.getValue();

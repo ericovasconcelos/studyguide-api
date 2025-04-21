@@ -1,10 +1,12 @@
 import { Result } from '../../domain/result';
 import { Study } from '../entities/Study';
-import { StudyCycle } from '../entities/StudyCycle';
+import { StudyCycle } from '../../data/models/StudyCycle';
 
 export interface StorageAdapter {
     getStudies(): Promise<Result<Study[]>>;
     saveStudy(study: Study): Promise<Result<void>>;
+    updateStudy(study: Study): Promise<Result<void>>;
+    deleteStudy(id: string): Promise<Result<void>>;
     clearStudies(): Promise<void>;
   
     getStudyCycles(): Promise<Result<StudyCycle[]>>;

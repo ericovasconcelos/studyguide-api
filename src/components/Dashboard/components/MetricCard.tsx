@@ -1,6 +1,5 @@
 import React from 'react';
 import { Card, Typography, Tooltip } from 'antd';
-import { AntdIconType } from '../types';
 
 const { Title, Text } = Typography;
 

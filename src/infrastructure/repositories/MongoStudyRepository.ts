@@ -53,9 +53,25 @@ export class MongoStudyRepository implements IStudyRepository {
       const studyData = await this.collection.findOne({ id });
       if (!studyData) return null;
       
-      const studyResult = Study.create(studyData as StudyProps);
-      if (studyResult.isFailure()) {
-        throw new Error(studyResult.getError());
+      // Manually create StudyProps from MongoDB data
+      const props: StudyProps = {
+        id: studyData.id, // Assuming MongoDB doc has 'id' field matching StudyProps
+        userId: studyData.userId || 'default', // Provide default or handle missing userId
+        date: new Date(studyData.date), // Ensure date is a Date object
+        subject: studyData.subject,
+        topic: studyData.topic || '',
+        duration: studyData.timeSpent, // Assuming MongoDB doc has timeSpent as number
+        notes: studyData.notes || '',
+        createdAt: new Date(studyData.createdAt),
+        updatedAt: new Date(studyData.updatedAt)
+      };
+
+      const studyResult = Study.create(props);
+      if (studyResult.failed()) { // Use failed()
+        // Log the specific error and potentially the problematic data
+        logger.error(this.context, 'Failed to create Study entity from DB data', { id, error: studyResult.getError(), data: studyData });
+        // Decide how to handle invalid data from DB - return null or throw?
+        return null; // Or throw new Error(...)
       }
       
       return studyResult.getValue();
@@ -68,16 +84,31 @@ export class MongoStudyRepository implements IStudyRepository {
   async findByUserId(userId: string): Promise<Study[]> {
     try {
       const studiesData = await this.collection.find({ userId }).toArray();
-      return studiesData.map(data => {
-        const studyResult = Study.create(data as StudyProps);
-        if (studyResult.isFailure()) {
-          throw new Error(studyResult.getError());
-        }
-        return studyResult.getValue();
-      });
+      const validStudies: Study[] = [];
+      for (const data of studiesData) {
+          // Manually create StudyProps from MongoDB data
+          const props: StudyProps = {
+            id: data.id, 
+            userId: data.userId || 'default',
+            date: new Date(data.date),
+            subject: data.subject,
+            topic: data.topic || '',
+            duration: data.timeSpent,
+            notes: data.notes || '',
+            createdAt: new Date(data.createdAt),
+            updatedAt: new Date(data.updatedAt)
+          };
+          const studyResult = Study.create(props);
+          if (studyResult.succeeded()) { // Use succeeded() here
+              validStudies.push(studyResult.getValue());
+          } else {
+              logger.warn(this.context, 'Skipping invalid study data from DB in findByUserId', { userId, error: studyResult.getError(), data });
+          }
+      }
+      return validStudies;
     } catch (error) {
       logger.error(this.context, 'Error finding studies by user id', { userId, error });
-      throw error;
+      throw error; // Re-throw or return empty array?
     }
   }
 
@@ -85,26 +116,32 @@ export class MongoStudyRepository implements IStudyRepository {
     try {
       const studiesData = await this.collection.find({
         userId,
-        date: {
-          $gte: startDate,
-          $lte: endDate
-        }
+        date: { $gte: startDate, $lte: endDate }
       }).toArray();
       
-      return studiesData.map(data => {
-        const studyResult = Study.create(data as StudyProps);
-        if (studyResult.isFailure()) {
-          throw new Error(studyResult.getError());
-        }
-        return studyResult.getValue();
-      });
+      const validStudies: Study[] = [];
+      for (const data of studiesData) {
+          const props: StudyProps = {
+            id: data.id, 
+            userId: data.userId || 'default',
+            date: new Date(data.date),
+            subject: data.subject,
+            topic: data.topic || '',
+            duration: data.timeSpent,
+            notes: data.notes || '',
+            createdAt: new Date(data.createdAt),
+            updatedAt: new Date(data.updatedAt)
+          };
+          const studyResult = Study.create(props);
+          if (studyResult.succeeded()) { // Use succeeded()
+              validStudies.push(studyResult.getValue());
+          } else {
+              logger.warn(this.context, 'Skipping invalid study data from DB in findByDateRange', { userId, error: studyResult.getError(), data });
+          }
+      }
+      return validStudies;
     } catch (error) {
-      logger.error(this.context, 'Error finding studies by date range', { 
-        userId, 
-        startDate, 
-        endDate, 
-        error 
-      });
+      logger.error(this.context, 'Error finding studies by date range', { userId, startDate, endDate, error });
       throw error;
     }
   }
@@ -132,13 +169,27 @@ export class MongoStudyRepository implements IStudyRepository {
   async findAll(): Promise<Study[]> {
     try {
       const studiesData = await this.collection.find().toArray();
-      return studiesData.map(data => {
-        const studyResult = Study.create(data as StudyProps);
-        if (studyResult.isFailure()) {
-          throw new Error(studyResult.getError());
-        }
-        return studyResult.getValue();
-      });
+      const validStudies: Study[] = [];
+      for (const data of studiesData) {
+          const props: StudyProps = {
+            id: data.id, 
+            userId: data.userId || 'default',
+            date: new Date(data.date),
+            subject: data.subject,
+            topic: data.topic || '',
+            duration: data.timeSpent,
+            notes: data.notes || '',
+            createdAt: new Date(data.createdAt),
+            updatedAt: new Date(data.updatedAt)
+          };
+          const studyResult = Study.create(props);
+          if (studyResult.succeeded()) { // Use succeeded()
+              validStudies.push(studyResult.getValue());
+          } else {
+              logger.warn(this.context, 'Skipping invalid study data from DB in findAll', { error: studyResult.getError(), data });
+          }
+      }
+      return validStudies;
     } catch (error) {
       logger.error(this.context, 'Error finding all studies', { error });
       throw error;

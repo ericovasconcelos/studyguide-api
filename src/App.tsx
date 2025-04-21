@@ -17,7 +17,8 @@ import StudyForm from "./components/StudyForm";
 import StudyCycleManager from "./components/StudyCycleManager";
 import { NewStudyDashboard } from "./components/Dashboard/NewStudyDashboard";
 import SettingsManager from "./components/SettingsManager";
-import { useDataContext, DataProvider } from './contexts/DataContext';
+import { DataProvider } from './contexts/DataContext';
+import { useStudies } from './hooks/useStudies';
 import { Study } from './domain/entities/Study';
 
 import "./App.css";
@@ -29,10 +30,9 @@ function AppContent() {
     studies,
     loading: studiesLoading,
     error: studiesError,
-    saveStudy,
+    save,
     refresh: refreshStudies,
-    sync
-  } = useDataContext();
+  } = useStudies();
 
   // Estados da UI
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -47,18 +47,9 @@ function AppContent() {
     refreshStudies();
   }, [refreshStudies]);
 
-  // Efeito para sincronização periódica
-  useEffect(() => {
-    const interval = setInterval(() => {
-      sync();
-    }, 300000); // 5 minutos
-
-    return () => clearInterval(interval);
-  }, [sync]);
-
   const handleSaveStudy = async (newRecord: Study) => {
     try {
-      await saveStudy(newRecord);
+      await save(newRecord);
       setIsModalVisible(false);
       notification.success({
         message: 'Estudo registrado',

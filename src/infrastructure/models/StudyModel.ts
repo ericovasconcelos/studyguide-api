@@ -1,5 +1,5 @@
 import mongoose, { Document } from 'mongoose';
-import { StudyEntity, Study } from '../../domain/entities/Study';
+import { Study, StudyProps } from '../../domain/entities/Study';
 import { Duration } from '../../domain/value-objects/Duration';
 
 interface IStudyDocument extends Document {
@@ -33,18 +33,18 @@ studySchema.pre('save', function(next) {
 // Add toDomain method to convert MongoDB document to domain entity
 studySchema.methods.toDomain = function(this: IStudyDocument) {
   const durationResult = Duration.create(this.duration);
-  if (durationResult.isFailure()) {
+  if (durationResult.failed()) {
     throw new Error(durationResult.getError());
   }
 
-  const props: StudyEntity = {
-    id: this._id.toString(),
+  const props: StudyProps = {
+    id: (this._id as any).toString(),
     userId: this.userId,
     date: this.date,
     subject: this.subject,
     topic: this.topic,
-    duration: durationResult.getValue(),
-    notes: this.notes,
+    duration: this.duration,
+    notes: this.notes ?? '',
     createdAt: this.createdAt,
     updatedAt: this.updatedAt
   };
