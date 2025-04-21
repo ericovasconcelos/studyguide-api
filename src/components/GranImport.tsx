@@ -3,6 +3,7 @@ import { Card, Button, Progress, Alert, List, Typography, Space } from 'antd';
 import { CloudDownloadOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { importService, studyService } from '../data/config/dependencies';
 import { getApiUrl } from '../config/env';
+import { useGranToken } from '../hooks/useGranToken';
 
 const { Text } = Typography;
 
@@ -36,6 +37,9 @@ export default function GranImport() {
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use the Gran token hook
+  const { token: granToken } = useGranToken();
   
   // Implementando fetch com retry para contornar problemas de rede/CORS
   const fetchWithRetry = async (url: string, options: RequestInit, maxRetries = 2, delay = 1000): Promise<Response> => {
@@ -113,6 +117,13 @@ export default function GranImport() {
       setError(null);
       setResult(null);
 
+      // Check if we have a token
+      if (!granToken) {
+        setError('Token do Gran Cursos não encontrado. Configure o token nas configurações.');
+        setImporting(false);
+        return;
+      }
+
       // Primeiro, tentar buscar dados do backend
       const apiUrl = getApiUrl('gran');
       console.log('[DEBUG] Tentando importar dados do Gran via:', apiUrl);
@@ -123,7 +134,7 @@ export default function GranImport() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('granToken')}`
+            'Authorization': `Bearer ${granToken}`
           }
         });
       } catch (error) {

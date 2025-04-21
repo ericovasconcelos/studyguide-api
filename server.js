@@ -20,6 +20,7 @@ const mongoose = require('mongoose');
 const compression = require('compression');
 const syncRoutes = require('./server/sync');
 const studyRoutes = require('./server/studies');
+const granTokenRoutes = require('./dist/routes/granToken').default;
 
 // Importando as funções para gerar dados simulados
 const { 
@@ -89,6 +90,7 @@ mongoose.connect(process.env.MONGODB_URI, {
 // Routes
 app.use('/sync', syncRoutes);
 app.use('/api/studies', studyRoutes);
+app.use('/api/gran-token', granTokenRoutes);
 
 // Endpoint para verificar a conexão com a API
 app.get('/api/health', async (req, res) => {

@@ -127,6 +127,102 @@ POST /api/studies/import/gran
 }
 ```
 
+### Tokens do Gran Cursos
+
+#### Obter Token do Gran
+```http
+GET /api/gran-token/:userId
+```
+
+**Path Parameters:**
+- `userId`: ID do usuário
+
+**Resposta (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "granToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "granTokenUpdatedAt": "2024-04-21T10:00:00Z"
+  }
+}
+```
+
+**Resposta (404):**
+```json
+{
+  "success": false,
+  "message": "User not found or token not set"
+}
+```
+
+#### Salvar Token do Gran
+```http
+POST /api/gran-token/:userId
+```
+
+**Path Parameters:**
+- `userId`: ID do usuário
+
+**Body:**
+```json
+{
+  "granToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Resposta (200):**
+```json
+{
+  "success": true,
+  "message": "Gran token saved successfully",
+  "data": {
+    "userId": "user123",
+    "tokenUpdatedAt": "2024-04-21T10:00:00Z"
+  }
+}
+```
+
+**Resposta (400):**
+```json
+{
+  "success": false,
+  "message": "Invalid token format"
+}
+```
+
+**Resposta (404):**
+```json
+{
+  "success": false,
+  "message": "User not found"
+}
+```
+
+#### Remover Token do Gran
+```http
+DELETE /api/gran-token/:userId
+```
+
+**Path Parameters:**
+- `userId`: ID do usuário
+
+**Resposta (200):**
+```json
+{
+  "success": true,
+  "message": "Gran token cleared successfully"
+}
+```
+
+**Resposta (404):**
+```json
+{
+  "success": false,
+  "message": "User not found"
+}
+```
+
 ### Autenticação
 
 #### Login

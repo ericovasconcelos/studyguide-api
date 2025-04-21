@@ -8,7 +8,7 @@ StudyGuide é uma aplicação web para gerenciamento de estudos, construída seg
 ### 1. Domain Layer
 - **Entities**: Classes que representam os conceitos principais do domínio
   - `Study`: Representa uma sessão de estudo com propriedades como data, assunto, tópico e duração
-  - `User`: Representa um usuário do sistema com suas credenciais e permissões
+  - `User`: Representa um usuário do sistema com suas credenciais, permissões e tokens de integração
 - **Value Objects**: Objetos imutáveis que representam conceitos do domínio
   - `Duration`: Representa a duração de um estudo em minutos
   - `DateRange`: Representa um intervalo de datas
@@ -52,14 +52,17 @@ StudyGuide é uma aplicação web para gerenciamento de estudos, construída seg
 - **Repositories**: Implementações concretas dos repositórios
   - `StudyRepository`: Implementação do IStudyRepository
   - `MongoStudyRepository`: Implementação usando MongoDB
+  - `UserRepository`: Implementação do IUserRepository para gerenciamento de usuários e tokens
 - **Models**: Modelos de dados para persistência
   - `StudyModel`: Modelo MongoDB para estudos
+  - `UserModel`: Modelo MongoDB para usuários e credenciais
 
 ### 4. Presentation Layer
 - **Controllers**: Controladores da API REST
   - `StudyController`: Endpoints para estudos
   - `AuthController`: Endpoints para autenticação
   - `ImportController`: Endpoints para importação
+  - `GranTokenController`: Endpoints para gerenciamento de tokens do Gran Cursos
 - **Middleware**: Middleware para requisições HTTP
   - `AuthMiddleware`: Autenticação e autorização
   - `ValidationMiddleware`: Validação de dados
@@ -69,6 +72,7 @@ StudyGuide é uma aplicação web para gerenciamento de estudos, construída seg
   - `useAuth`: Gerencia autenticação no frontend
   - `useData`: Gerencia dados e sincronização
   - `useImport`: Gerencia importação de dados
+  - `useGranToken`: Gerencia token do Gran Cursos com persistência no banco e fallback no localStorage
 
 ## Fluxo de Dados
 
@@ -108,13 +112,19 @@ StudyGuide é uma aplicação web para gerenciamento de estudos, construída seg
    - Validação de permissões em cada endpoint
    - Proteção contra CSRF
 
-3. **Validação**
+3. **Armazenamento de Tokens de Integração**
+   - Tokens do Gran Cursos armazenados no MongoDB com o modelo de usuário
+   - Estratégia híbrida com fallback para localStorage para compatibilidade
+   - Sincronização automática de tokens entre dispositivos
+   - Proteção contra acesso não autorizado a tokens de APIs de terceiros
+
+4. **Validação**
    - Sanitização de inputs
    - Validação de tipos e formatos
    - Proteção contra injeção de código
    - Validação de dados do Gran Cursos
 
-4. **Rate Limiting**
+5. **Rate Limiting**
    - Limite de 100 requisições por 15 minutos para API
    - Limite de 5 tentativas de login por hora
    - Limite de 10 importações por hora
