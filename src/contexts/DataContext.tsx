@@ -4,6 +4,8 @@ import { CompositeAdapter } from '../data/adapters/CompositeAdapter';
 import { LocalStorageAdapter } from '../data/adapters/LocalStorageAdapter';
 import { ServerSyncAdapter } from '../data/adapters/ServerSyncAdapter';
 import { Result } from '../domain/result';
+import { getCurrentUserId } from '../config/auth'; // no topo, se ainda não tiver
+
 
 interface DataContextType {
   studies: Study[];
@@ -28,18 +30,23 @@ export const useDataContext = () => {
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const localStorageAdapter = new LocalStorageAdapter();
-  const serverSyncAdapter = new ServerSyncAdapter();
+
+  const userId = getCurrentUserId(); // função já existe no projeto
+  const serverSyncAdapter = new ServerSyncAdapter(userId);
+
   const adapter = new CompositeAdapter(localStorageAdapter, serverSyncAdapter);
-  
+
   const [studies, setStudies] = useState<Study[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleResult = <T,>(result: Result<T>) => {
-    if (result.isSuccess) {
+    if (result.isSuccessful()) {
+
       return result.getValue();
     } else {
-      setError(result.getErrorValue());
+      setError(result.getError());
+
       return null;
     }
   };

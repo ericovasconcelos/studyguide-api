@@ -5,6 +5,7 @@ import { DataCleanupManager } from './DataCleanupManager';
 import { DataCleanupService } from '../services/DataCleanupService';
 import { logger } from '../utils/logger';
 import { useDataContext } from '../contexts/DataContext';
+import { cleanupService } from '../data/config/dependencies';
 
 const { TabPane } = Tabs;
 
@@ -160,10 +161,11 @@ export default function SettingsManager({ onClose }: SettingsManagerProps) {
           </Card>
         </TabPane>
       </Tabs>
-
+      
       <DataCleanupManager
         visible={cleanupVisible}
         onClose={() => setCleanupVisible(false)}
+        cleanupService={cleanupService}
       />
 
       <Form layout="vertical">

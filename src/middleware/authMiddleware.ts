@@ -57,7 +57,7 @@ export class AuthMiddleware {
       });
 
       const result = await Result.fromPromise(verifyTokenPromise);
-      if (result.isFailure()) {
+      if (result.failed()) {
         return res.status(401).json({ error: 'Invalid token' });
       }
 

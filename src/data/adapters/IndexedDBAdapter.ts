@@ -1,4 +1,4 @@
-import { StorageAdapter } from './StorageAdapter';
+import { StorageAdapter } from '../../domain/interfaces/StorageAdapter';
 import { Study } from '../../domain/entities/Study';
 import { StudyCycle } from '../models/StudyCycle';
 import { logger } from '../../utils/logger';
@@ -13,6 +13,8 @@ export class IndexedDBAdapter implements StorageAdapter {
     this.initDB();
   }
 
+  
+
   private initDB(): void {
     const request = indexedDB.open(this.dbName, this.version);
 
@@ -23,6 +25,7 @@ export class IndexedDBAdapter implements StorageAdapter {
     request.onsuccess = () => {
       this.db = request.result;
     };
+ 
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
@@ -33,6 +36,10 @@ export class IndexedDBAdapter implements StorageAdapter {
         db.createObjectStore('studyCycles', { keyPath: 'id' });
       }
     };
+  }
+
+  async clearStudies(): Promise<void> {
+    return void 0;
   }
 
   async getStudies(): Promise<Result<Study[]>> {
@@ -131,9 +138,7 @@ export class IndexedDBAdapter implements StorageAdapter {
     });
   }
 
-  invalidateCache(): void {
-    // No cache to invalidate in IndexedDB
-  }
+ 
 
   async getStudyCycles(): Promise<Result<StudyCycle[]>> {
     if (!this.db) {
@@ -230,4 +235,10 @@ export class IndexedDBAdapter implements StorageAdapter {
       lastUpdated: new Date()
     };
   }
+
+  async invalidateCache(): Promise<Result<void>> {
+    // Pode ser só um stub por enquanto
+    return Result.ok(undefined);
+  }
+
 } 

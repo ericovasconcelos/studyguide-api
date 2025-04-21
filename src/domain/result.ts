@@ -1,40 +1,50 @@
 export class Result<T> {
-  private readonly isSuccess: boolean;
-  private readonly value?: T;
-  private readonly error?: string;
+  private constructor(
+    private readonly isSuccess: boolean,
+    private readonly value?: T,
+    private readonly error?: string
+  ) {}
 
-  private constructor(isSuccess: boolean, value?: T, error?: string) {
-    this.isSuccess = isSuccess;
-    this.value = value;
-    this.error = error;
+  public static ok<U>(value?: U): Result<U> {
+    return new Result<U>(true, value);
   }
 
-  public static ok<T>(value?: T): Result<T> {
-    return new Result<T>(true, value);
+  public static fail<U>(error: string): Result<U> {
+    return new Result<U>(false, undefined, error);
   }
 
-  public static fail<T>(error: string): Result<T> {
-    return new Result<T>(false, undefined, error);
-  }
-
-  public static async fromPromise<T>(promise: Promise<T>): Promise<Result<T>> {
-    try {
-      const value = await promise;
-      return Result.ok(value);
-    } catch (error) {
-      return Result.fail(error instanceof Error ? error.message : 'Unknown error');
+  public getValue(): T {
+    if (!this.isSuccess || this.value === undefined) {
+      throw new Error("Cannot get the value of a failed result.");
     }
+    return this.value;
+  }
+
+  public getError(): string {
+    if (this.isSuccess || !this.error) {
+      throw new Error("Cannot get error from a successful result.");
+    }
+    return this.error;
+  }
+
+  public succeeded(): boolean {
+    return this.isSuccess;
+  }
+
+  public failed(): boolean {
+    return !this.isSuccess;
   }
 
   public isSuccessful(): boolean {
     return this.isSuccess;
   }
 
-  public getValue(): T | undefined {
-    return this.value;
+  public static async fromPromise<U>(promise: Promise<U>): Promise<Result<U>> {
+    try {
+      const result = await promise;
+      return Result.ok(result);
+    } catch (error: any) {
+      return Result.fail<U>(error?.message || 'Unknown error');
+    }
   }
-
-  public getError(): string | undefined {
-    return this.error;
-  }
-} 
+}

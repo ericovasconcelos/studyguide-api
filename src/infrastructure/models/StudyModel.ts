@@ -50,7 +50,7 @@ studySchema.methods.toDomain = function(this: IStudyDocument) {
   };
   
   const result = Study.create(props);
-  if (result.isFailure()) {
+  if (result.failed()) {
     throw new Error(result.getError());
   }
   

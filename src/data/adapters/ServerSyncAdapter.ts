@@ -1,10 +1,10 @@
 import { Result } from '../../domain/result';
 import { Study } from '../../domain/entities/Study';
-import { StorageAdapter } from './StorageAdapter';
+import { StorageAdapter } from '../../domain/interfaces/StorageAdapter';
 import { logger } from '../../utils/logger';
 import axios from 'axios';
 import { StudyCycle } from '../models/StudyCycle';
-import { config, getApiUrl } from '../../config/env';
+import { getApiUrl } from '../../config/env';
 import { IndexedDBAdapter } from './IndexedDBAdapter';
 
 interface SyncData {
@@ -276,5 +276,10 @@ export class ServerSyncAdapter implements StorageAdapter {
       logger.error('Error clearing study cycles', { error });
       throw error;
     }
+  }
+
+  async invalidateCache(): Promise<Result<void>> {
+    // Pode ser só um stub por enquanto
+    return Result.ok(undefined);
   }
 } 

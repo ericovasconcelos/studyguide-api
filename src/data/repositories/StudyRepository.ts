@@ -33,7 +33,7 @@ export class StudyRepository implements IStudyRepository {
       id: domainStudy.getId(),
       date: domainStudy.getDate().toISOString(),
       subject: domainStudy.getSubject(),
-      timeSpent: domainStudy.getDuration().getMinutes(),
+      timeSpent: domainStudy.getDuration(),
       topic: domainStudy.getTopic(),
       notes: domainStudy.getNotes(),
       createdAt: domainStudy.getCreatedAt().toISOString(),

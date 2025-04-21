@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { toDashboardStudy } from "./utils/mapper";
+import { toDashboardStudy } from './utils/adapters'; // ajuste o caminho conforme necessário
+
 import { Button, Modal, Menu, Avatar, Badge, ConfigProvider, Typography, notification } from "antd";
 import {
   DashboardOutlined,
