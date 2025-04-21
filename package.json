@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "react-app-rewired": "^2.2.1",
     "@ant-design/icons": "^6.0.0",
     "@babel/core": "^7.26.9",
     "@babel/preset-env": "^7.26.9",
