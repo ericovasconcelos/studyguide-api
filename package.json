@@ -46,7 +46,7 @@
     "eject": "react-scripts eject",
     "server": "node server.js",
     "dev": "concurrently \"npm run start\" \"npm run server\"",
-    "deploy": "node server.js"
+    "deploy": "npm run build && node server.js"
   },
   "eslintConfig": {
     "extends": [
