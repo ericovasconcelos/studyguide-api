@@ -124,8 +124,9 @@ export default function GranImport() {
         return;
       }
 
-      // Primeiro, tentar buscar dados do backend
-      const apiUrl = getApiUrl('gran');
+      // Use a URL base correta para o backend
+      const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const apiUrl = `${apiBaseUrl}/api/gran`;
       console.log('[DEBUG] Tentando importar dados do Gran via:', apiUrl);
 
       let response: Response;

@@ -20,7 +20,33 @@ const mongoose = require('mongoose');
 const compression = require('compression');
 const syncRoutes = require('./server/sync');
 const studyRoutes = require('./server/studies');
-const granTokenRoutes = require('./dist/routes/granToken').default;
+
+// Try to require the TypeScript compiled granToken routes with a fallback
+let granTokenRoutes;
+try {
+  const granTokenModule = require('./dist/routes/granToken');
+  // Handle both ESM and CommonJS default exports
+  granTokenRoutes = granTokenModule.default || granTokenModule;
+  console.log('[INFO] Successfully loaded granToken routes from TypeScript build');
+} catch (error) {
+  console.error('[ERROR] Failed to load TypeScript granToken routes:', error.message);
+  console.error('[ERROR] Please run "npm run build:backend" before starting the server');
+  console.error('[ERROR] Exiting...');
+  process.exit(1);
+}
+
+// Try to require the TypeScript compiled user routes
+let userRoutes;
+try {
+  const userModule = require('./dist/routes/user');
+  // Handle both ESM and CommonJS default exports
+  userRoutes = userModule.default || userModule;
+  console.log('[INFO] Successfully loaded user routes from TypeScript build');
+} catch (error) {
+  console.error('[ERROR] Failed to load TypeScript user routes:', error.message);
+  console.error('[ERROR] User management will not be available');
+  // Continue without user routes
+}
 
 // Importando as funções para gerar dados simulados
 const { 
@@ -91,6 +117,12 @@ mongoose.connect(process.env.MONGODB_URI, {
 app.use('/sync', syncRoutes);
 app.use('/api/studies', studyRoutes);
 app.use('/api/gran-token', granTokenRoutes);
+
+// Only add user routes if they were successfully loaded
+if (userRoutes) {
+  app.use('/api/users', userRoutes);
+  console.log('[INFO] User routes enabled at /api/users');
+}
 
 // Endpoint para verificar a conexão com a API
 app.get('/api/health', async (req, res) => {

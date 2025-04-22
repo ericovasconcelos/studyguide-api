@@ -1,0 +1,35 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "module": "commonjs",
+    "noEmit": false,
+    "esModuleInterop": true,
+    "target": "es2018",
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "allowJs": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "src/routes/**/*", 
+    "src/controllers/**/*", 
+    "src/domain/**/*", 
+    "src/infrastructure/**/*", 
+    "src/services/**/*", 
+    "src/utils/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/components/**/*", 
+    "src/hooks/**/*", 
+    "src/contexts/**/*", 
+    "src/**/*.test.ts", 
+    "src/**/*.spec.ts", 
+    "src/setupTests.ts",
+    "src/reportWebVitals.ts",
+    "src/index.tsx",
+    "src/config/env.ts", 
+    "src/config/auth.ts"
+  ]
+} 

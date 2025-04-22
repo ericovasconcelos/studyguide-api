@@ -3,6 +3,9 @@ import { getCurrentUserId } from '../config/auth';
 import { logger } from '../utils/logger';
 import axios from 'axios';
 
+// Get the correct API URL
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
 export interface GranTokenData {
   granToken: string | null;
   granTokenUpdatedAt: Date | null;
@@ -15,6 +18,19 @@ export function useGranToken() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const userId = getCurrentUserId();
 
+  // Salvar o token no banco de dados (memoized)
+  const saveTokenToDB = useCallback(async (tokenToSave: string): Promise<void> => {
+    try {
+      await axios.post(`${API_BASE_URL}/api/gran-token/${userId}`, {
+        granToken: tokenToSave
+      });
+      logger.info('Token do Gran Cursos salvo no banco de dados');
+    } catch (err) {
+      logger.error('Erro ao salvar token do Gran no banco de dados', err);
+      throw err;
+    }
+  }, [userId]);
+
   // Carregar o token do banco de dados (se disponível)
   useEffect(() => {
     const loadTokenFromDB = async () => {
@@ -24,7 +40,7 @@ export function useGranToken() {
         
         // Tentar buscar do backend primeiro
         try {
-          const response = await axios.get(`/api/gran-token/${userId}`);
+          const response = await axios.get(`${API_BASE_URL}/api/gran-token/${userId}`);
           
           // Se a resposta for bem-sucedida e tiver um token, use-o
           if (response.data.success && response.data.data.granToken) {
@@ -59,7 +75,7 @@ export function useGranToken() {
     };
 
     loadTokenFromDB();
-  }, [userId, token]);
+  }, [userId, token, saveTokenToDB]);
 
   // Salvar token no banco de dados e localStorage
   const saveToken = useCallback(async (newToken: string): Promise<boolean> => {
@@ -86,20 +102,7 @@ export function useGranToken() {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
-
-  // Salvar o token no banco de dados
-  const saveTokenToDB = async (tokenToSave: string): Promise<void> => {
-    try {
-      await axios.post(`/api/gran-token/${userId}`, {
-        granToken: tokenToSave
-      });
-      logger.info('Token do Gran Cursos salvo no banco de dados');
-    } catch (err) {
-      logger.error('Erro ao salvar token do Gran no banco de dados', err);
-      throw err;
-    }
-  };
+  }, [userId, saveTokenToDB]);
 
   // Remover token
   const clearToken = useCallback(async (): Promise<boolean> => {
@@ -109,7 +112,7 @@ export function useGranToken() {
 
       // Remover do banco de dados
       try {
-        await axios.delete(`/api/gran-token/${userId}`);
+        await axios.delete(`${API_BASE_URL}/api/gran-token/${userId}`);
         logger.info('Token do Gran Cursos removido do banco de dados');
       } catch (err) {
         logger.warn('Erro ao remover token do Gran do banco de dados', err);
