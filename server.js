@@ -20,6 +20,7 @@ const mongoose = require('mongoose');
 const compression = require('compression');
 const syncRoutes = require('./server/sync');
 const studyRoutes = require('./server/studies');
+const fixStaticServing = require('./fix-static-serving');
 
 // Try to require the TypeScript compiled granToken routes with a fallback
 let granTokenRoutes;
@@ -95,23 +96,13 @@ app.use(cors(corsOptions));
 app.use(compression());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(fixStaticServing);
 
 // Middleware para logging de requisições
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
-
-// Servir arquivos estáticos e rota catch-all APENAS em produção
-if (process.env.NODE_ENV === 'production') {
-  // Servir build estático
-  app.use(express.static(path.join(__dirname, 'build')));
-
-  // Rota catch-all para SPA (Single Page Application)
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'build', 'index.html'));
-  });
-}
 
 // Tokens para teste local
 const validTokens = [
