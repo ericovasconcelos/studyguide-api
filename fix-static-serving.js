@@ -1,5 +1,10 @@
 // fix-static-serving.js
 const fixStaticServing = (req, res, next) => {
+  // Nunca interferir com solicitações OPTIONS (CORS preflight)
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+  
   // Lista de caminhos da API que sabemos que funcionam
   const apiPaths = ['/api', '/status', '/sync'];
   

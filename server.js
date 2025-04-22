@@ -77,32 +77,28 @@ const API_VERSION = '1.0.0';
 
 // Configuração CORS
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? [
-        process.env.RENDER_EXTERNAL_URL || 'https://studyguide-api.onrender.com',
-        process.env.FRONTEND_URL || 'https://studyguide.vercel.app',
-        'https://studyguide.vercel.app',
-        'https://studyguide-git-master.vercel.app',
-        'https://*.vercel.app'
-      ]
-    : ['http://localhost:3000', 'http://localhost:5000', 'http://localhost:5001', 'http://127.0.0.1:3000', 'http://127.0.0.1:5000', 'http://127.0.0.1:5001', '*'],
+  origin: '*', // Temporariamente aceitar todas as origens para diagnóstico
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Id'],
   credentials: true
 };
 
-// Middleware
+// Middleware - importante: o CORS deve vir ANTES de qualquer outro middleware
 app.use(cors(corsOptions));
+
+// Depois os outros middlewares
 app.use(compression());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(fixStaticServing);
 
 // Middleware para logging de requisições
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
   next();
 });
+
+// O fixStaticServing deve vir DEPOIS do CORS e outros middlewares essenciais
+app.use(fixStaticServing);
 
 // Tokens para teste local
 const validTokens = [
