@@ -102,7 +102,7 @@ export function useGranToken() {
     } finally {
       setLoading(false);
     }
-  }, [userId, saveTokenToDB]);
+  }, [saveTokenToDB]);
 
   // Remover token
   const clearToken = useCallback(async (): Promise<boolean> => {
@@ -134,7 +134,7 @@ export function useGranToken() {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, []);
 
   return {
     token,
