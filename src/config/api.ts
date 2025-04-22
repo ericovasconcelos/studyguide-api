@@ -3,11 +3,8 @@
  * This file contains all the API related configuration
  */
 
-// API Base URL - By default will be localhost:5000 for development
-// In production, it will use the window.location.origin (same domain as the frontend)
-export const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? window.location.origin 
-  : process.env.REACT_APP_API_URL || 'http://localhost:5000';
+// API Base URL - Sempre usar a variável de ambiente configurada
+export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 // Endpoints
 export const ENDPOINTS = {
