@@ -4,6 +4,7 @@ import { StorageAdapter } from '../../domain/interfaces/StorageAdapter';
 import { logger } from '../../utils/logger';
 import axios from 'axios';
 import { StudyCycle } from '../models/StudyCycle';
+import { API_BASE_URL } from '../../config/api';
 
 interface SyncData {
   studies: Study[];
@@ -12,7 +13,7 @@ interface SyncData {
 }
 
 export class ServerSyncAdapter implements StorageAdapter {
-  private readonly API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+  private readonly API_URL = API_BASE_URL;
   private readonly userId: string;
 
   constructor(userId: string) {
@@ -21,7 +22,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async getStudies(): Promise<Result<Study[]>> {
     try {
-      const response = await fetch(`${this.API_URL}/studies?userId=${this.userId}`);
+      const response = await fetch(`${this.API_URL}/api/studies?userId=${this.userId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch studies');
       }
@@ -37,7 +38,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async saveStudy(study: Study): Promise<Result<void>> {
     try {
-      const response = await fetch(`${this.API_URL}/studies`, {
+      const response = await fetch(`${this.API_URL}/api/studies`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -58,7 +59,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async updateStudy(study: Study): Promise<Result<void>> {
     try {
-      const response = await fetch(`${this.API_URL}/studies/${study.getId()}`, {
+      const response = await fetch(`${this.API_URL}/api/studies/${study.getId()}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -79,7 +80,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async deleteStudy(id: string): Promise<Result<void>> {
     try {
-      const response = await fetch(`${this.API_URL}/studies/${id}`, {
+      const response = await fetch(`${this.API_URL}/api/studies/${id}`, {
         method: 'DELETE',
       });
 
@@ -96,7 +97,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async sync(): Promise<Result<void>> {
     try {
-      const response = await fetch(`${this.API_URL}/sync`, {
+      const response = await fetch(`${this.API_URL}/api/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -117,7 +118,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async downloadChanges(): Promise<Result<SyncData>> {
     try {
-      const response = await axios.get<SyncData>(`${this.API_URL}/sync`);
+      const response = await axios.get<SyncData>(`${this.API_URL}/api/sync`);
       return Result.ok(response.data);
     } catch (error) {
       logger.error('Error downloading changes', { error });
@@ -127,7 +128,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async uploadChanges(studies: Study[]): Promise<Result<void>> {
     try {
-      await axios.post(`${this.API_URL}/sync`, { studies, timestamp: new Date() });
+      await axios.post(`${this.API_URL}/api/sync`, { studies, timestamp: new Date() });
       return Result.ok(undefined);
     } catch (error) {
       logger.error('Error uploading changes', { error });
@@ -137,7 +138,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async saveStudies(studies: Study[]): Promise<void> {
     try {
-      const url = `${this.API_URL}/studies/bulk`;
+      const url = `${this.API_URL}/api/studies/bulk`;
       logger.debug('Enviando estudos para o servidor', {
         url,
         count: studies.length,
@@ -211,7 +212,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async clearUserData(): Promise<void> {
     try {
-      const url = `${this.API_URL}/studies`;
+      const url = `${this.API_URL}/api/studies`;
       const response = await fetch(url, {
         method: 'DELETE',
       });
@@ -229,7 +230,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async clearSystemData(): Promise<void> {
     try {
-      const url = `${this.API_URL}/system`;
+      const url = `${this.API_URL}/api/system`;
       const response = await fetch(url, {
         method: 'DELETE',
       });
@@ -247,7 +248,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async getStudyCycles(): Promise<Result<StudyCycle[]>> {
     try {
-      const response = await axios.get<StudyCycle[]>(`${this.API_URL}/cycles`);
+      const response = await axios.get<StudyCycle[]>(`${this.API_URL}/api/cycles`);
       return Result.ok(response.data);
     } catch (error) {
       logger.error('Error getting study cycles', { error });
@@ -257,7 +258,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async saveStudyCycle(cycle: StudyCycle): Promise<Result<void>> {
     try {
-      await axios.post(`${this.API_URL}/cycles`, cycle);
+      await axios.post(`${this.API_URL}/api/cycles`, cycle);
       return Result.ok(undefined);
     } catch (error) {
       logger.error('Error saving study cycle', { error });
@@ -267,7 +268,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async saveStudyCycles(cycles: StudyCycle[]): Promise<Result<void>> {
     try {
-      await axios.post(`${this.API_URL}/cycles/bulk`, cycles);
+      await axios.post(`${this.API_URL}/api/cycles/bulk`, cycles);
       return Result.ok(undefined);
     } catch (error) {
       logger.error('Error saving study cycles', { error });
@@ -277,7 +278,7 @@ export class ServerSyncAdapter implements StorageAdapter {
 
   async clearStudyCycles(): Promise<Result<void>> {
     try {
-      await axios.delete(`${this.API_URL}/cycles`);
+      await axios.delete(`${this.API_URL}/api/cycles`);
       return Result.ok(undefined);
     } catch (error) {
       logger.error('Error clearing study cycles', { error });
@@ -286,7 +287,12 @@ export class ServerSyncAdapter implements StorageAdapter {
   }
 
   async invalidateCache(): Promise<Result<void>> {
-    // Pode ser só um stub por enquanto
-    return Result.ok(undefined);
+    try {
+      await axios.post(`${this.API_URL}/api/cache/invalidate`);
+      return Result.ok(undefined);
+    } catch (error) {
+      logger.error('Error invalidating cache', { error });
+      return Result.fail('Failed to invalidate cache');
+    }
   }
 } 

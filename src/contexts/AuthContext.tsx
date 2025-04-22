@@ -1,11 +1,10 @@
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useContext } from 'react';
 import axios from 'axios';
 import { getCurrentUserId, setPermanentUserId } from '../config/auth';
 import { logger } from '../utils/logger';
 import { notification } from 'antd';
-
-// Definir a URL base da API
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+import { API_BASE_URL } from '../config/api';
+import { User } from '../domain/entities/User';
 
 // Interface para o usuário autenticado
 interface AuthUser {
@@ -191,20 +190,46 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   // Função de logout
-  const logout = () => {
-    // Limpar token e dados do usuário
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('auth_user');
-    
-    // Limpar headers
-    delete axios.defaults.headers.common['Authorization'];
-    
-    // Atualizar estado
-    setToken(null);
-    setUser(null);
-    setIsAuthenticated(false);
-    
-    logger.info('User logged out');
+  const logout = async () => {
+    try {
+      // Limpar tokens da sessão do usuário atual antes de deslogar
+      const currentUser = user;
+      if (currentUser?.id) {
+        try {
+          // Limpar todos os tokens associados ao usuário
+          const granTokenKey = `granToken_${currentUser.id}`;
+          localStorage.removeItem(granTokenKey);
+          
+          // Tenta remover o token legado também (sem prefixo)
+          localStorage.removeItem('granToken');
+          
+          // Opcional: tentar limpar no servidor também
+          await axios.delete(`${API_BASE_URL}/api/users/${currentUser.id}/grantoken`).catch(() => {
+            // Ignora erros aqui, já que estamos no processo de logout
+            console.log('Não foi possível limpar o token no servidor durante logout');
+          });
+        } catch (error) {
+          console.error('Erro ao limpar tokens durante logout:', error);
+          // Continua com o logout mesmo se falhar a limpeza de tokens
+        }
+      }
+
+      // Limpar token e dados do usuário
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      
+      // Limpar headers
+      delete axios.defaults.headers.common['Authorization'];
+      
+      // Atualizar estado
+      setToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
+      
+      logger.info('User logged out');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
   };
 
   // Objeto com os valores do contexto

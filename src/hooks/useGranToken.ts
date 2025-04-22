@@ -11,35 +11,47 @@ export interface GranTokenData {
   granTokenUpdatedAt: Date | null;
 }
 
+// Adicionar prefixo do usuário à chave do localStorage
+const getLocalStorageKey = (userId: string) => `granToken_${userId}`;
+
 export function useGranToken() {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('granToken'));
+  const [token, setToken] = useState<string | null>(localStorage.getItem(getLocalStorageKey(getCurrentUserId())));
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const userId = getCurrentUserId();
 
   // Salvar o token no banco de dados (memoized)
-  const saveTokenToDB = useCallback(async (tokenToSave: string): Promise<void> => {
+  const saveTokenToDB = useCallback(async (userId: string, tokenToSave: string): Promise<void> => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/api/gran-token/${userId}`, {
+      logger.info(`Saving token for user ${userId}`);
+      
+      const response = await axios.post(`${API_BASE_URL}/api/users/${userId}/grantoken`, {
         granToken: tokenToSave
       });
-      logger.info('Token do Gran Cursos salvo no banco de dados');
-    } catch (err) {
-      // Extrair mensagem de erro mais detalhada da resposta da API
-      let errorMessage = 'Erro ao salvar token do Gran no banco de dados';
-      if (axios.isAxiosError(err) && err.response) {
-        // Se houver resposta da API com mensagem de erro
-        const apiError = err.response.data?.error || err.response.data?.message;
-        if (apiError) {
-          errorMessage = `Erro: ${apiError}`;
-        }
+      
+      if (!response.data.success) {
+        const errorMessage = response.data.error || 'Failed to save token';
+        logger.error(`Error saving token: ${errorMessage}`);
+        throw new Error(errorMessage);
       }
       
-      logger.error(errorMessage, err);
+      // Atualizar o localStorage COM O ID DO USUÁRIO na chave
+      localStorage.setItem(getLocalStorageKey(userId), tokenToSave);
+      
+      logger.info('Token saved successfully');
+    } catch (error: any) {
+      logger.error('Error saving token:', error);
+      
+      // Extrair mensagem de erro detalhada da resposta da API se disponível
+      let errorMessage = 'Failed to save token';
+      if (error.response?.data?.error) {
+        errorMessage = `${errorMessage}: ${error.response.data.error}`;
+      }
+      
       throw new Error(errorMessage);
     }
-  }, [userId]);
+  }, []);
 
   // Carregar o token do banco de dados (se disponível)
   useEffect(() => {
@@ -50,21 +62,21 @@ export function useGranToken() {
         
         // Tentar buscar do backend primeiro
         try {
-          const response = await axios.get(`${API_BASE_URL}/api/gran-token/${userId}`);
+          const response = await axios.get(`${API_BASE_URL}/api/users/${userId}/grantoken`);
           
-          // Se a resposta for bem-sucedida e tiver um token, use-o
-          if (response.data.success && response.data.data.granToken) {
-            const tokenData = response.data.data;
+          if (response.data?.granToken) {
+            logger.info('Token loaded from database');
+            const tokenData = response.data;
             setToken(tokenData.granToken);
             setLastUpdated(new Date(tokenData.granTokenUpdatedAt));
             
             // Sincronizar com localStorage para compatibilidade
-            localStorage.setItem('granToken', tokenData.granToken);
+            localStorage.setItem(getLocalStorageKey(userId), tokenData.granToken);
             
             logger.info('Token do Gran Cursos carregado do banco de dados');
           } else if (token) {
             // Se não houver token no banco, mas temos no localStorage, salve-o no banco
-            await saveTokenToDB(token);
+            await saveTokenToDB(userId, token);
           }
         } catch (err) {
           // Se falhar a busca no backend, usar o localStorage como fallback
@@ -94,14 +106,14 @@ export function useGranToken() {
       setError(null);
 
       // Salvar no banco de dados
-      await saveTokenToDB(newToken);
+      await saveTokenToDB(userId, newToken);
       
       // Atualizar estado local
       setToken(newToken);
       setLastUpdated(new Date());
       
       // Salvar no localStorage para compatibilidade
-      localStorage.setItem('granToken', newToken);
+      localStorage.setItem(getLocalStorageKey(userId), newToken);
       
       return true;
     } catch (err) {
@@ -113,7 +125,7 @@ export function useGranToken() {
     } finally {
       setLoading(false);
     }
-  }, [saveTokenToDB]);
+  }, [userId, saveTokenToDB]);
 
   // Remover token
   const clearToken = useCallback(async (): Promise<boolean> => {
@@ -123,8 +135,22 @@ export function useGranToken() {
 
       // Remover do banco de dados
       try {
-        await axios.delete(`${API_BASE_URL}/api/gran-token/${userId}`);
-        logger.info('Token do Gran Cursos removido do banco de dados');
+        const response = await axios.delete(`${API_BASE_URL}/api/users/${userId}/grantoken`);
+        
+        if (!response.data.success) {
+          const errorMessage = response.data.error || 'Failed to clear token';
+          logger.error(`Error clearing token: ${errorMessage}`);
+          throw new Error(errorMessage);
+        }
+        
+        // Remover do localStorage
+        localStorage.removeItem(getLocalStorageKey(userId));
+        
+        // Atualizar estado local
+        setToken(null);
+        setLastUpdated(null);
+        
+        logger.info('Token cleared successfully');
       } catch (err) {
         // Extrair mensagem de erro mais detalhada da resposta da API
         let errorMessage = 'Erro ao remover token do Gran do banco de dados';
@@ -139,13 +165,6 @@ export function useGranToken() {
         throw new Error(errorMessage);
       }
 
-      // Remover do localStorage
-      localStorage.removeItem('granToken');
-      
-      // Atualizar estado local
-      setToken(null);
-      setLastUpdated(null);
-      
       return true;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Erro ao remover token';
