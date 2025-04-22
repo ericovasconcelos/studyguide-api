@@ -134,7 +134,7 @@ export function useGranToken() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   return {
     token,
