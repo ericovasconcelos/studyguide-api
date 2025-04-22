@@ -2,9 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getCurrentUserId } from '../config/auth';
 import { logger } from '../utils/logger';
 import axios from 'axios';
-
-// Get the correct API URL
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+import { API_BASE_URL } from '../config/api';
 
 export interface GranTokenData {
   granToken: string | null;
