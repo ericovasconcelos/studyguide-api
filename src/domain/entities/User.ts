@@ -54,8 +54,8 @@ export class User {
       return Result.fail('Name is required');
     }
 
-    if (!props.passwordHash) {
-      return Result.fail('Password hash is required');
+    if (props.passwordHash === undefined || props.passwordHash === null) {
+      props.passwordHash = '';
     }
 
     if (!props.createdAt) {

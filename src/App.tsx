@@ -10,7 +10,8 @@ import {
   BellOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  UserOutlined
+  UserOutlined,
+  LogoutOutlined
 } from "@ant-design/icons";
 
 import StudyForm from "./components/StudyForm";
@@ -18,14 +19,27 @@ import StudyCycleManager from "./components/StudyCycleManager";
 import { NewStudyDashboard } from "./components/Dashboard/NewStudyDashboard";
 import SettingsManager from "./components/SettingsManager";
 import { DataProvider } from './contexts/DataContext';
+import { AuthProvider } from './contexts/AuthContext';
 import { useStudies } from './hooks/useStudies';
+import { useAuth } from './hooks/useAuth';
 import { Study } from './domain/entities/Study';
+import { LoginPage } from './components/LoginPage';
+import { RegisterPage } from './components/RegisterPage';
 
 import "./App.css";
 
 const { Text } = Typography;
 
+// Enum para páginas de autenticação
+enum AuthPage {
+  LOGIN = 'login',
+  REGISTER = 'register'
+}
+
 function AppContent() {
+  const { isAuthenticated, user, logout } = useAuth();
+  const [authPage, setAuthPage] = useState<AuthPage>(AuthPage.LOGIN);
+  
   const {
     studies,
     loading: studiesLoading,
@@ -42,10 +56,16 @@ function AppContent() {
   const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
   const [studyCycle, setStudyCycle] = useState(null);
 
+  // Funções para alternar entre páginas de autenticação
+  const showLoginPage = () => setAuthPage(AuthPage.LOGIN);
+  const showRegisterPage = () => setAuthPage(AuthPage.REGISTER);
+
   // Efeito para carregar dados iniciais
   useEffect(() => {
-    refreshStudies();
-  }, [refreshStudies]);
+    if (isAuthenticated) {
+      refreshStudies();
+    }
+  }, [isAuthenticated, refreshStudies]);
 
   const handleSaveStudy = async (newRecord: Study) => {
     try {
@@ -63,6 +83,15 @@ function AppContent() {
         placement: 'topRight'
       });
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    notification.info({
+      message: 'Logout realizado',
+      description: 'Você saiu do sistema com sucesso',
+      placement: 'topRight'
+    });
   };
 
   const renderHeader = () => (
@@ -86,7 +115,18 @@ function AppContent() {
         <Badge count={5}>
           <Button type="text" icon={<BellOutlined />} />
         </Badge>
-        <Avatar icon={<UserOutlined />} />
+        <div className="user-info">
+          {user && (
+            <span className="user-name">{user.name}</span>
+          )}
+          <Avatar icon={<UserOutlined />} />
+          <Button 
+            type="text" 
+            icon={<LogoutOutlined />} 
+            onClick={handleLogout}
+            title="Sair"
+          />
+        </div>
       </div>
     </div>
   );
@@ -125,6 +165,15 @@ function AppContent() {
       />
     </div>
   );
+
+  // Se não estiver autenticado, mostrar página de login ou registro
+  if (!isAuthenticated) {
+    if (authPage === AuthPage.LOGIN) {
+      return <LoginPage onRegisterClick={showRegisterPage} />;
+    } else {
+      return <RegisterPage onLoginClick={showLoginPage} />;
+    }
+  }
 
   if (studiesLoading) {
     return (
@@ -203,7 +252,7 @@ function AppContent() {
           footer={null}
           width={800}
         >
-          <SettingsManager />
+          <SettingsManager onClose={() => setIsSettingsModalVisible(false)} />
         </Modal>
       </div>
     </ConfigProvider>
@@ -212,8 +261,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <DataProvider>
-      <AppContent />
-    </DataProvider>
+    <AuthProvider>
+      <DataProvider>
+        <AppContent />
+      </DataProvider>
+    </AuthProvider>
   );
 }

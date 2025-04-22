@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, Card, Form, Input, Button, Switch, Alert, notification, Space, Divider, message } from 'antd';
-import { ApiOutlined, SettingOutlined, DatabaseOutlined } from '@ant-design/icons';
+import { ApiOutlined, SettingOutlined, DatabaseOutlined, LockOutlined } from '@ant-design/icons';
 import { DataCleanupManager } from './DataCleanupManager';
+import { ChangePasswordForm } from './ChangePasswordForm';
 import { logger } from '../utils/logger';
 import { useDataContext } from '../contexts/DataContext';
+import { useAuth } from '../hooks/useAuth';
 import { cleanupService } from '../data/config/dependencies';
 import { useGranToken } from '../hooks/useGranToken';
 
@@ -20,6 +22,9 @@ export default function SettingsManager({ onClose }: SettingsManagerProps) {
   const [darkMode, setDarkMode] = useState(false);
   const [cleanupVisible, setCleanupVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Usar o hook useAuth para obter informações do usuário
+  const { user } = useAuth();
 
   // Usar o hook useGranToken para gerenciar o token do Gran
   const { token, saveToken, clearToken, error: tokenError, loading: tokenLoading } = useGranToken();
@@ -102,6 +107,14 @@ export default function SettingsManager({ onClose }: SettingsManagerProps) {
     }
   };
 
+  // Handler para o sucesso da alteração de senha
+  const handlePasswordChangeSuccess = () => {
+    message.success('Senha alterada com sucesso!');
+    if (onClose) {
+      setTimeout(onClose, 1500);
+    }
+  };
+
   return (
     <div className="settings-manager">
       <Tabs defaultActiveKey="integrations">
@@ -177,6 +190,33 @@ export default function SettingsManager({ onClose }: SettingsManagerProps) {
                 <Switch checked={notificationsEnabled} onChange={setNotificationsEnabled} />
               </div>
             </Space>
+          </Card>
+        </TabPane>
+
+        <TabPane
+          tab={
+            <span>
+              <LockOutlined />
+              Segurança
+            </span>
+          }
+          key="security"
+        >
+          <Card title="Alterar Senha" className="settings-card">
+            {user ? (
+              <ChangePasswordForm 
+                userId={user.id} 
+                onSuccess={handlePasswordChangeSuccess}
+                onCancel={onClose}
+              />
+            ) : (
+              <Alert
+                message="Usuário não encontrado"
+                description="É necessário estar logado para alterar a senha."
+                type="warning"
+                showIcon
+              />
+            )}
           </Card>
         </TabPane>
 

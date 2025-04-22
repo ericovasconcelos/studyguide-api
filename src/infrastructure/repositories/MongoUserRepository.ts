@@ -42,8 +42,19 @@ export class MongoUserRepository implements IUserRepository {
       
       const newUser = await UserModel.create(userData);
       return newUser.toDomain();
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Error saving user', error);
+      
+      // Verificar se é um erro de chave duplicada (MongoDB error code 11000)
+      if (error.code === 11000) {
+        // Verificar qual campo está duplicado
+        if (error.keyPattern && error.keyPattern.email) {
+          throw new Error('Email already registered');
+        } else if (error.keyPattern && error.keyPattern._id) {
+          throw new Error('User with this ID already exists');
+        }
+      }
+      
       throw new Error('Failed to save user');
     }
   }

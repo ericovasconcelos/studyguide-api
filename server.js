@@ -48,6 +48,19 @@ try {
   // Continue without user routes
 }
 
+// Try to require the TypeScript compiled auth routes
+let authRoutes;
+try {
+  const authModule = require('./dist/routes/auth');
+  // Handle both ESM and CommonJS default exports
+  authRoutes = authModule.default || authModule;
+  console.log('[INFO] Successfully loaded auth routes from TypeScript build');
+} catch (error) {
+  console.error('[ERROR] Failed to load TypeScript auth routes:', error.message);
+  console.error('[ERROR] Authentication will not be available');
+  // Continue without auth routes
+}
+
 // Importando as funções para gerar dados simulados
 const { 
   generateMockData,
@@ -122,6 +135,12 @@ app.use('/api/gran-token', granTokenRoutes);
 if (userRoutes) {
   app.use('/api/users', userRoutes);
   console.log('[INFO] User routes enabled at /api/users');
+}
+
+// Only add auth routes if they were successfully loaded
+if (authRoutes) {
+  app.use('/api/auth', authRoutes);
+  console.log('[INFO] Authentication enabled at /api/auth');
 }
 
 // Endpoint para verificar a conexão com a API

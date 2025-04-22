@@ -23,7 +23,13 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Name is required' });
     }
 
-    // Verificar se o usuário já existe
+    // Verificar se já existe um usuário com o mesmo email
+    const existingUserWithEmail = await userRepository.findByEmail(email);
+    if (existingUserWithEmail) {
+      return res.status(400).json({ success: false, error: 'Email already registered' });
+    }
+
+    // Verificar se o usuário já existe com mesmo ID
     const existingUser = await userRepository.findById(id);
     if (existingUser) {
       return res.status(400).json({ success: false, error: 'User already exists with this ID' });
@@ -34,7 +40,7 @@ router.post('/', async (req, res) => {
       id: id,
       email: email,
       name: name,
-      passwordHash: password || '', // Normalmente deve-se fazer hash da senha, mas simplificando para fins de teste
+      passwordHash: '', // Campo inicial vazio, será definido com hash abaixo
       role: role || 'user',
       createdAt: new Date(),
       updatedAt: new Date()
@@ -44,26 +50,47 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ success: false, error: userResult.getError() });
     }
 
+    // Definir a senha com hash
+    const user = userResult.getValue();
+    const passwordResult = await user.setPassword(password || '');
+    
+    if (passwordResult.failed()) {
+      return res.status(400).json({ success: false, error: passwordResult.getError() });
+    }
+
     // Salvar o novo usuário
-    const user = await userRepository.save(userResult.getValue());
+    const savedUser = await userRepository.save(user);
     logger.info(`New user created with ID: ${id}`);
 
     res.status(201).json({
       success: true,
       message: 'User created successfully',
       data: {
-        id: user.getId(),
-        email: user.getEmail(),
-        name: user.getName(),
-        role: user.getRole(),
-        createdAt: user.getCreatedAt()
+        id: savedUser.getId(),
+        email: savedUser.getEmail(),
+        name: savedUser.getName(),
+        role: savedUser.getRole(),
+        createdAt: savedUser.getCreatedAt()
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Error creating user', error);
+    
+    // Extrair mensagem de erro mais específica
+    let errorMessage = 'Internal server error';
+    
+    if (error.message) {
+      // Usar mensagens de erro específicas para melhor UX
+      if (error.message.includes('Email already registered') || 
+          error.message.includes('User with this ID already exists')) {
+        errorMessage = error.message;
+        return res.status(400).json({ success: false, error: errorMessage });
+      }
+    }
+    
     res.status(500).json({
       success: false,
-      error: 'Internal server error'
+      error: errorMessage
     });
   }
 });
