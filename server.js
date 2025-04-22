@@ -122,18 +122,58 @@ mongoose.connect(process.env.MONGODB_URI, {
 // Routes
 app.use('/sync', syncRoutes);
 app.use('/api/studies', studyRoutes);
-app.use('/api/gran-token', granTokenRoutes);
 
 // Only add user routes if they were successfully loaded
 if (userRoutes) {
   app.use('/api/users', userRoutes);
   console.log('[INFO] User routes enabled at /api/users');
+  
+  // Adiciona as rotas de grantoken sob o caminho /api/users/:userId/grantoken
+  if (granTokenRoutes) {
+    // Criar um roteador específico para as rotas grantoken associadas a um usuário
+    const granTokenUserRouter = express.Router({ mergeParams: true });
+    granTokenUserRouter.get('/', async (req, res) => {
+      req.params.userId = req.params.userId; // Garantir que userId seja passado
+      const controller = require('./dist/controllers/GranTokenController').GranTokenController;
+      const repository = require('./dist/infrastructure/repositories/MongoUserRepository').MongoUserRepository;
+      const userRepo = new repository();
+      const granTokenController = new controller(userRepo);
+      await granTokenController.getToken(req, res);
+    });
+    
+    granTokenUserRouter.post('/', async (req, res) => {
+      req.params.userId = req.params.userId; // Garantir que userId seja passado
+      const controller = require('./dist/controllers/GranTokenController').GranTokenController;
+      const repository = require('./dist/infrastructure/repositories/MongoUserRepository').MongoUserRepository;
+      const userRepo = new repository();
+      const granTokenController = new controller(userRepo);
+      await granTokenController.saveToken(req, res);
+    });
+    
+    granTokenUserRouter.delete('/', async (req, res) => {
+      req.params.userId = req.params.userId; // Garantir que userId seja passado
+      const controller = require('./dist/controllers/GranTokenController').GranTokenController;
+      const repository = require('./dist/infrastructure/repositories/MongoUserRepository').MongoUserRepository;
+      const userRepo = new repository();
+      const granTokenController = new controller(userRepo);
+      await granTokenController.clearToken(req, res);
+    });
+    
+    app.use('/api/users/:userId/grantoken', granTokenUserRouter);
+    console.log('[INFO] Gran token routes enabled at /api/users/:userId/grantoken');
+  }
 }
 
 // Only add auth routes if they were successfully loaded
 if (authRoutes) {
   app.use('/api/auth', authRoutes);
   console.log('[INFO] Authentication enabled at /api/auth');
+}
+
+// Manter a rota antiga por um tempo para compatibilidade
+if (granTokenRoutes) {
+  app.use('/api/gran-token', granTokenRoutes);
+  console.log('[INFO] Gran token routes also available at /api/gran-token (deprecated)');
 }
 
 // Endpoint para verificar a conexão com a API

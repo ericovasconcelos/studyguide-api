@@ -24,11 +24,49 @@ export class ServerSyncAdapter implements StorageAdapter {
     try {
       const response = await fetch(`${this.API_URL}/api/studies?userId=${this.userId}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch studies');
+        const errorText = await response.text();
+        logger.error('Failed to fetch studies', { 
+          statusCode: response.status, 
+          statusText: response.statusText,
+          errorResponse: errorText,
+          userId: this.userId,
+          url: `${this.API_URL}/api/studies?userId=${this.userId}`
+        });
+        throw new Error(`Failed to fetch studies: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
       const data = await response.json();
-      const studies = data.map((study: any) => Study.fromEntity(study));
+      if (!Array.isArray(data)) {
+        logger.warn('Unexpected API response format', { responseType: typeof data, response: data });
+        if (data && typeof data === 'object' && data.data && Array.isArray(data.data)) {
+          logger.info('Using data array from response object');
+          const studiesData = data.data;
+          const studies: Study[] = [];
+          
+          for (const studyData of studiesData) {
+            const studyResult = Study.fromEntity(studyData);
+            if (studyResult.isSuccessful()) {
+              studies.push(studyResult.getValue());
+            } else {
+              logger.warn('Failed to convert study entity', { error: studyResult.getError(), data: studyData });
+            }
+          }
+          
+          return Result.ok(studies);
+        }
+        return Result.ok([]);
+      }
+
+      const studies: Study[] = [];
+      for (const studyData of data) {
+        const studyResult = Study.fromEntity(studyData);
+        if (studyResult.isSuccessful()) {
+          studies.push(studyResult.getValue());
+        } else {
+          logger.warn('Failed to convert study entity', { error: studyResult.getError(), data: studyData });
+        }
+      }
+      
       return Result.ok(studies);
     } catch (error) {
       logger.error('Failed to get studies from server', { error });
