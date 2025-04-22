@@ -7,7 +7,7 @@ import { logger } from '../../utils/logger';
 export class MongoUserRepository implements IUserRepository {
   async findById(id: string): Promise<User | null> {
     try {
-      const user = await UserModel.findById(id);
+      const user = await UserModel.findOne({ _id: id });
       if (!user) {
         return null;
       }
@@ -34,10 +34,11 @@ export class MongoUserRepository implements IUserRepository {
   async save(user: User): Promise<User> {
     try {
       const userData = user.toEntity();
-      // Remove ID for new user creation to let MongoDB generate it
       if (!userData.id || userData.id === '') {
-        delete userData.id;
+        userData.id = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       }
+      
+      userData._id = userData.id;
       
       const newUser = await UserModel.create(userData);
       return newUser.toDomain();
@@ -50,8 +51,8 @@ export class MongoUserRepository implements IUserRepository {
   async update(user: User): Promise<User> {
     try {
       const userData = user.toEntity();
-      const updatedUser = await UserModel.findByIdAndUpdate(
-        userData.id,
+      const updatedUser = await UserModel.findOneAndUpdate(
+        { _id: userData.id },
         {
           email: userData.email,
           name: userData.name,
@@ -77,7 +78,7 @@ export class MongoUserRepository implements IUserRepository {
 
   async delete(id: string): Promise<void> {
     try {
-      await UserModel.findByIdAndDelete(id);
+      await UserModel.findOneAndDelete({ _id: id });
     } catch (error) {
       logger.error('Error deleting user', error);
       throw new Error('Failed to delete user');
@@ -86,7 +87,7 @@ export class MongoUserRepository implements IUserRepository {
 
   async updateGranToken(userId: string, granToken: string): Promise<Result<void>> {
     try {
-      const user = await UserModel.findById(userId);
+      const user = await UserModel.findOne({ _id: userId });
       if (!user) {
         return Result.fail('User not found');
       }
@@ -105,7 +106,7 @@ export class MongoUserRepository implements IUserRepository {
 
   async clearGranToken(userId: string): Promise<Result<void>> {
     try {
-      const user = await UserModel.findById(userId);
+      const user = await UserModel.findOne({ _id: userId });
       if (!user) {
         return Result.fail('User not found');
       }

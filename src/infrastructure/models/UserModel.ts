@@ -3,6 +3,7 @@ import { Result } from '../../domain/result';
 import { User, UserProps } from '../../domain/entities/User';
 
 interface IUserDocument extends Document {
+  _id: string;
   email: string;
   name: string;
   passwordHash: string;
@@ -16,6 +17,7 @@ interface IUserDocument extends Document {
 }
 
 const userSchema = new mongoose.Schema({
+  _id: { type: String },
   email: { type: String, required: true, unique: true },
   name: { type: String, required: true },
   passwordHash: { type: String, required: true },
@@ -25,7 +27,7 @@ const userSchema = new mongoose.Schema({
   settings: { type: mongoose.Schema.Types.Mixed, default: {} },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
-});
+}, { _id: false });
 
 userSchema.pre('save', function(next) {
   this.updatedAt = new Date();
@@ -35,7 +37,7 @@ userSchema.pre('save', function(next) {
 // Add toDomain method to convert MongoDB document to domain entity
 userSchema.methods.toDomain = function(this: IUserDocument) {
   const props: UserProps = {
-    id: (this._id as any).toString(),
+    id: this._id,
     email: this.email,
     name: this.name,
     passwordHash: this.passwordHash,

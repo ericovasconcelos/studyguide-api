@@ -21,13 +21,23 @@ export function useGranToken() {
   // Salvar o token no banco de dados (memoized)
   const saveTokenToDB = useCallback(async (tokenToSave: string): Promise<void> => {
     try {
-      await axios.post(`${API_BASE_URL}/api/gran-token/${userId}`, {
+      const response = await axios.post(`${API_BASE_URL}/api/gran-token/${userId}`, {
         granToken: tokenToSave
       });
       logger.info('Token do Gran Cursos salvo no banco de dados');
     } catch (err) {
-      logger.error('Erro ao salvar token do Gran no banco de dados', err);
-      throw err;
+      // Extrair mensagem de erro mais detalhada da resposta da API
+      let errorMessage = 'Erro ao salvar token do Gran no banco de dados';
+      if (axios.isAxiosError(err) && err.response) {
+        // Se houver resposta da API com mensagem de erro
+        const apiError = err.response.data?.error || err.response.data?.message;
+        if (apiError) {
+          errorMessage = `Erro: ${apiError}`;
+        }
+      }
+      
+      logger.error(errorMessage, err);
+      throw new Error(errorMessage);
     }
   }, [userId]);
 
@@ -95,6 +105,7 @@ export function useGranToken() {
       
       return true;
     } catch (err) {
+      // Usar a mensagem de erro detalhada que vem do saveTokenToDB
       const errorMsg = err instanceof Error ? err.message : 'Erro ao salvar token';
       setError(errorMsg);
       logger.error('Erro ao salvar token do Gran Cursos', err);
@@ -115,7 +126,17 @@ export function useGranToken() {
         await axios.delete(`${API_BASE_URL}/api/gran-token/${userId}`);
         logger.info('Token do Gran Cursos removido do banco de dados');
       } catch (err) {
-        logger.warn('Erro ao remover token do Gran do banco de dados', err);
+        // Extrair mensagem de erro mais detalhada da resposta da API
+        let errorMessage = 'Erro ao remover token do Gran do banco de dados';
+        if (axios.isAxiosError(err) && err.response) {
+          const apiError = err.response.data?.error || err.response.data?.message;
+          if (apiError) {
+            errorMessage = `Erro: ${apiError}`;
+          }
+        }
+        
+        logger.warn(errorMessage, err);
+        throw new Error(errorMessage);
       }
 
       // Remover do localStorage
